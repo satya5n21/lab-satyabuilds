@@ -15,7 +15,7 @@ async function copyDirectoryContents(source, destination) {
 }
 
 const sources = [
-  join(repoRoot, 'site'),
+  join(repoRoot, 'site', 'dist'),
   join(repoRoot, 'apps', 'dyson-sphere', 'site'),
   join(repoRoot, 'apps', 'cosmo-music-visualizer', 'dist'),
 ];

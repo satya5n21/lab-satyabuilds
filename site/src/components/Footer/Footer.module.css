@@ -1,0 +1,16 @@
+.footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 58px;
+    padding-top: 20px;
+    border-top: 1px solid rgb(160 170 208 / 13%);
+    color: #737a93;
+    font-size: 0.78rem;
+}
+
+@media (max-width: 700px) {
+    .footer {
+        margin-top: 40px;
+    }
+}

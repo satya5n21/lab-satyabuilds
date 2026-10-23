@@ -1,0 +1,23 @@
+.shell {
+    width: min(1080px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 76px 0 40px;
+}
+
+.projects {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+@media (max-width: 700px) {
+    .shell {
+        width: min(100% - 32px, 520px);
+        padding-top: 52px;
+    }
+
+    .projects {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}

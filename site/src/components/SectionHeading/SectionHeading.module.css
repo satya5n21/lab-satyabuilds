@@ -1,0 +1,24 @@
+.sectionHeading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 64px 0 20px;
+    color: #d7d9e5;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.sectionHeading::after {
+    height: 1px;
+    flex: 1;
+    background: linear-gradient(90deg, rgb(173 184 255 / 24%), transparent);
+    content: "";
+}
+
+@media (max-width: 700px) {
+    .sectionHeading {
+        margin-top: 48px;
+    }
+}

@@ -1,4 +1,8 @@
 node_modules
 dist/
+*.tsbuildinfo
 /deployment/public/
+.env
+.env.*
+!.env.example
 .wrangler/

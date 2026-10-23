@@ -12,6 +12,7 @@ A small monorepo for independent web experiments.
 Run these from the repository root after `npm install`:
 
 ```sh
+npm run dev:site
 npm run dev:cosmo-music-visualizer
 npm run dev:dyson-sphere
 ```
@@ -30,3 +31,10 @@ The combined site is assembled in `deployment/public`. The homepage is at `/`,
 the Dyson Sphere app is at `/dyson-sphere/`, and the music visualizer is at
 `/cosmo-music-visualizer/`. `wrangler.jsonc` points Cloudflare Wrangler at that
 assembled directory.
+
+For Cloudflare Workers Builds, set the project root to the repository root,
+the **Build command** to `npm run build`, and the **Deploy command** to
+`npx wrangler deploy`. The build command must run first because
+`deployment/public` is generated and is intentionally not committed. The
+`npm run deploy` script is an alternative Deploy command; it runs the build
+before Wrangler itself.
