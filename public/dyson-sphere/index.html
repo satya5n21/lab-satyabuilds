@@ -1,0 +1,2189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <link rel="icon" type="image/png" href="./icon.png" />
+    <title>Dyson Sphere Explorer</title>
+    <style>
+        :root {
+            --bg-deep: #03050a;
+            --bg-navy: #070c18;
+            --panel-bg: rgba(7, 13, 26, 0.78);
+            --panel-border: rgba(60, 230, 255, 0.22);
+            --panel-border-strong: rgba(60, 230, 255, 0.45);
+            --cyan: #3ce6ff;
+            --electric-blue: #2888ff;
+            --gold: #ffd478;
+            --amber: #f5a623;
+            --text-primary: #eef4ff;
+            --text-secondary: rgba(214, 228, 255, 0.72);
+            --text-muted: rgba(168, 190, 228, 0.52);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #viewport-container {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 50%, #0a1226 0%, #040710 65%, #020307 100%);
+        }
+
+        canvas#scene-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        canvas#scene-canvas:active {
+            cursor: grabbing;
+        }
+
+        .vignette-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(circle at center, transparent 55%, rgba(2, 4, 9, 0.65) 100%);
+            z-index: 2;
+        }
+
+        /* Opening Hero Modal Overlay */
+        #intro-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: radial-gradient(circle at center, rgba(4, 8, 18, 0.35) 0%, rgba(2, 5, 12, 0.78) 100%);
+            transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.45s;
+        }
+
+        #intro-overlay.dismissed {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .intro-card {
+            max-width: 540px;
+            width: 100%;
+            padding: 34px 32px 30px;
+            background: rgba(6, 11, 23, 0.9);
+            border: 1px solid var(--panel-border-strong);
+            border-radius: 14px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75), 0 0 40px rgba(40, 136, 255, 0.12);
+            text-align: center;
+        }
+
+        .intro-kicker {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            padding: 4px 10px;
+            border: 1px solid rgba(60, 230, 255, 0.3);
+            border-radius: 999px;
+            margin-bottom: 14px;
+            background: rgba(60, 230, 255, 0.06);
+        }
+
+        .intro-title {
+            font-size: clamp(22px, 4vw, 30px);
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .intro-subtitle {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 18px;
+        }
+
+        .intro-description {
+            font-size: 14px;
+            line-height: 1.65;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .explore-btn {
+            appearance: none;
+            border: 1px solid var(--cyan);
+            background: linear-gradient(135deg, rgba(40, 136, 255, 0.28) 0%, rgba(60, 230, 255, 0.16) 100%);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            padding: 13px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+            box-shadow: 0 0 24px rgba(60, 230, 255, 0.2);
+        }
+
+        .explore-btn:hover {
+            background: linear-gradient(135deg, rgba(40, 136, 255, 0.45) 0%, rgba(60, 230, 255, 0.3) 100%);
+            box-shadow: 0 0 32px rgba(60, 230, 255, 0.38);
+            transform: translateY(-1px);
+        }
+
+        .explore-btn:active {
+            transform: translateY(0);
+        }
+
+        /* HUD Layer */
+        #hud-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        #hud-layer.ui-hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .hud-panel {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+        }
+
+        /* Top Left Header */
+        .hud-top-left {
+            position: absolute;
+            top: calc(16px + var(--safe-top));
+            left: 16px;
+            padding: 12px 16px;
+            max-width: 340px;
+        }
+
+        .brand-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .brand-subtitle {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-top: 3px;
+        }
+
+        .active-mode-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: rgba(40, 136, 255, 0.14);
+            border: 1px solid rgba(60, 230, 255, 0.28);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--cyan);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: 0 0 8px var(--cyan);
+        }
+
+        /* Top Right Quick Actions & Camera Bar */
+        .hud-top-right {
+            position: absolute;
+            top: calc(16px + var(--safe-top));
+            right: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px;
+            justify-content: flex-end;
+            max-width: calc(100vw - 380px);
+        }
+
+        .icon-btn {
+            appearance: none;
+            background: rgba(14, 24, 46, 0.78);
+            border: 1px solid rgba(60, 230, 255, 0.22);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            padding: 7px 11px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+            white-space: nowrap;
+        }
+
+        .icon-btn:hover {
+            background: rgba(40, 136, 255, 0.22);
+            border-color: var(--cyan);
+        }
+
+        .icon-btn.active {
+            background: rgba(60, 230, 255, 0.18);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .icon-btn.amber-active {
+            background: rgba(245, 166, 35, 0.18);
+            border-color: var(--amber);
+            color: var(--gold);
+        }
+
+        /* Bottom Left Telemetry Panel */
+        .hud-bottom-left {
+            position: absolute;
+            bottom: calc(16px + var(--safe-bottom));
+            left: 16px;
+            width: 330px;
+            max-width: calc(100vw - 32px);
+            padding: 14px 16px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid rgba(60, 230, 255, 0.16);
+        }
+
+        .panel-title {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--cyan);
+        }
+
+        .panel-toggle-btn {
+            appearance: none;
+            background: transparent;
+            border: 1px solid rgba(60, 230, 255, 0.25);
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .panel-toggle-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--cyan);
+        }
+
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            row-gap: 6px;
+            column-gap: 10px;
+            font-size: 12px;
+        }
+
+        .telemetry-label {
+            color: var(--text-secondary);
+        }
+
+        .telemetry-value {
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .telemetry-value.highlight-amber {
+            color: var(--gold);
+        }
+
+        .telemetry-value.highlight-cyan {
+            color: var(--cyan);
+        }
+
+        .energy-bar-wrap {
+            margin: 10px 0 8px;
+            background: rgba(255, 255, 255, 0.07);
+            height: 5px;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .energy-bar-fill {
+            height: 100%;
+            width: 18%;
+            background: linear-gradient(90deg, var(--electric-blue), var(--cyan), var(--amber));
+            border-radius: 999px;
+            transition: width 0.2s ease;
+        }
+
+        .telemetry-note {
+            font-size: 10.5px;
+            line-height: 1.45;
+            color: var(--text-muted);
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .formula-tag {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: rgba(60, 230, 255, 0.8);
+            margin-top: 4px;
+        }
+
+        /* Bottom Right Configuration Controls */
+        .hud-bottom-right {
+            position: absolute;
+            bottom: calc(16px + var(--safe-bottom));
+            right: 16px;
+            width: 340px;
+            max-width: calc(100vw - 32px);
+            padding: 14px 16px;
+        }
+
+        .panel-body.collapsed {
+            display: none;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .control-label {
+            color: var(--text-secondary);
+        }
+
+        .control-readout {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--cyan);
+        }
+
+        /* Segmented Mode Selector */
+        .segmented-control {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            background: rgba(3, 7, 16, 0.75);
+            padding: 4px;
+            border-radius: 7px;
+            border: 1px solid rgba(60, 230, 255, 0.18);
+        }
+
+        .seg-btn {
+            appearance: none;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 7px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.18s ease, color 0.18s ease;
+        }
+
+        .seg-btn.active {
+            background: linear-gradient(135deg, rgba(40, 136, 255, 0.35), rgba(60, 230, 255, 0.2));
+            color: var(--text-primary);
+            border: 1px solid rgba(60, 230, 255, 0.45);
+        }
+
+        /* Range Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--cyan);
+            border: 2px solid #040812;
+            box-shadow: 0 0 10px rgba(60, 230, 255, 0.7);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--cyan);
+            border: 2px solid #040812;
+            box-shadow: 0 0 10px rgba(60, 230, 255, 0.7);
+            cursor: pointer;
+        }
+
+        .toggle-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .toggle-pill {
+            appearance: none;
+            background: rgba(12, 22, 42, 0.75);
+            border: 1px solid rgba(60, 230, 255, 0.2);
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 7px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.18s ease;
+        }
+
+        .toggle-pill.active {
+            border-color: rgba(60, 230, 255, 0.5);
+            color: var(--text-primary);
+            background: rgba(40, 136, 255, 0.18);
+        }
+
+        .toggle-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .toggle-pill.active .toggle-indicator {
+            background: var(--cyan);
+            box-shadow: 0 0 8px var(--cyan);
+        }
+
+        /* Floating Restore UI Button when hidden */
+        #restore-ui-btn {
+            position: fixed;
+            bottom: calc(18px + var(--safe-bottom));
+            right: 18px;
+            z-index: 25;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        #restore-ui-btn.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        /* Renderer Mode Banner (shown only on WebGL fallback/recovery) */
+        #renderer-notice {
+            position: fixed;
+            top: calc(14px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 22;
+            background: rgba(245, 166, 35, 0.16);
+            border: 1px solid rgba(245, 166, 35, 0.5);
+            color: var(--gold);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            pointer-events: none;
+            display: none;
+        }
+
+        /* Responsive Mobile Layout — Disable expensive backdrop-filter blur on mobile GPUs */
+        @media (max-width: 768px) {
+            .hud-panel {
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                background: rgba(7, 13, 26, 0.9);
+            }
+
+            .hud-top-left {
+                top: calc(10px + var(--safe-top));
+                left: 10px;
+                padding: 9px 12px;
+                max-width: 210px;
+            }
+
+            .brand-title {
+                font-size: 12px;
+            }
+
+            .brand-subtitle {
+                display: none;
+            }
+
+            .hud-top-right {
+                top: calc(10px + var(--safe-top));
+                right: 10px;
+                max-width: calc(100vw - 230px);
+                padding: 6px;
+                gap: 4px;
+            }
+
+            .icon-btn {
+                font-size: 10px;
+                padding: 6px 8px;
+            }
+
+            .hud-bottom-left {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: calc(64px + var(--safe-bottom));
+                padding: 10px 12px;
+            }
+
+            .hud-bottom-right {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: calc(10px + var(--safe-bottom));
+                padding: 10px 12px;
+            }
+
+            .intro-card {
+                padding: 24px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="viewport-container">
+        <canvas id="scene-canvas" aria-label="Interactive 3D Dyson Sphere Visualization"></canvas>
+    </div>
+    <div class="vignette-overlay"></div>
+    <div id="renderer-notice">CANVAS 2D FALLBACK MODE ACTIVE</div>
+
+    <!-- Opening Presentation Modal -->
+    <div id="intro-overlay" role="dialog" aria-labelledby="intro-title-el">
+        <div class="intro-card">
+            <span class="intro-kicker">KARDASHEV TYPE II SIMULATION</span>
+            <h1 class="intro-title" id="intro-title-el">DYSON SPHERE EXPLORER</h1>
+            <p class="intro-subtitle">HARNESSING THE POWER OF A STAR</p>
+            <p class="intro-description">
+                Journey into a stellar megastructure engineered to capture the electromagnetic output of its parent
+                star. Compare a physically plausible <strong>Dyson Swarm</strong> of thousands of independent solar
+                collectors with a speculative <strong>Dyson Shell</strong> enclosure.
+            </p>
+            <button class="explore-btn" id="explore-system-btn" type="button">EXPLORE SYSTEM</button>
+        </div>
+    </div>
+
+    <!-- Main Scientific Instrument Interface -->
+    <div id="hud-layer">
+        <!-- Top Left: Title & Active Configuration -->
+        <header class="hud-panel hud-top-left">
+            <div class="brand-title">DYSON SPHERE EXPLORER</div>
+            <div class="brand-subtitle">HARNESSING THE POWER OF A STAR</div>
+            <div class="active-mode-pill">
+                <span class="status-dot"></span>
+                <span id="header-mode-label">DYSON SWARM</span>
+            </div>
+        </header>
+
+        <!-- Top Right: Camera, Animation & Display Controls -->
+        <nav class="hud-panel hud-top-right" aria-label="Scene and Camera Controls">
+            <button class="icon-btn" id="zoom-in-btn" type="button" title="Zoom In">+</button>
+            <button class="icon-btn" id="zoom-out-btn" type="button" title="Zoom Out">&minus;</button>
+            <button class="icon-btn" id="reset-view-btn" type="button" title="Reset Camera to Default View">RESET
+                VIEW</button>
+            <button class="icon-btn active" id="auto-rotate-btn" type="button"
+                title="Toggle Automatic System Rotation">AUTO-ROTATE</button>
+            <button class="icon-btn" id="pause-btn" type="button" title="Pause or Resume Animation">PAUSE</button>
+            <button class="icon-btn" id="fullscreen-btn" type="button" title="Toggle Fullscreen">FULLSCREEN</button>
+            <button class="icon-btn" id="hide-ui-btn" type="button" title="Hide Interface (Shortcut: H)">HIDE
+                UI</button>
+        </nav>
+
+        <!-- Bottom Left: Live Educational Telemetry -->
+        <section class="hud-panel hud-bottom-left" aria-label="System Telemetry">
+            <div class="panel-header">
+                <span class="panel-title">SYSTEM TELEMETRY</span>
+                <button class="panel-toggle-btn" id="toggle-telemetry-btn" type="button">MINIMIZE</button>
+            </div>
+            <div class="panel-body" id="telemetry-body">
+                <div class="telemetry-grid">
+                    <span class="telemetry-label">Configuration</span>
+                    <span class="telemetry-value highlight-cyan" id="tel-config">Dyson Swarm</span>
+
+                    <span class="telemetry-label">Collector Count</span>
+                    <span class="telemetry-value" id="tel-count">1,600 Units</span>
+
+                    <span class="telemetry-label">Stellar Intensity</span>
+                    <span class="telemetry-value highlight-amber" id="tel-intensity">1.00 L☉</span>
+
+                    <span class="telemetry-label">Orbital Radius</span>
+                    <span class="telemetry-value" id="tel-radius">1.00 AU</span>
+
+                    <span class="telemetry-label">Captured Fraction</span>
+                    <span class="telemetry-value highlight-amber" id="tel-fraction">14.20%</span>
+
+                    <span class="telemetry-label">Captured Power</span>
+                    <span class="telemetry-value highlight-amber" id="tel-power">5.44 × 10²⁵ W</span>
+
+                    <span class="telemetry-label">Civilization Scale</span>
+                    <span class="telemetry-value highlight-cyan" id="tel-scale">Type 1.97 (Kardashev)</span>
+                </div>
+
+                <div class="energy-bar-wrap" title="Fraction of total stellar output intercepted">
+                    <div class="energy-bar-fill" id="tel-energy-bar"></div>
+                </div>
+
+                <p class="telemetry-note" id="tel-disclaimer">
+                    <strong>Simplified Theoretical Estimate:</strong> Assumes idealized spherical interception at shared
+                    orbital radius <em>r</em>. Real collector swarms experience shadowing, cosine orientation losses,
+                    and orbital spacing constraints.
+                    <span class="formula-tag">f = min(1, A_eff / (4 &times; &pi; &times; r&sup2;)) &bull; P = L&#9737;
+                        &times; f</span>
+                </p>
+            </div>
+        </section>
+
+        <!-- Bottom Right: Configurable Megastructure Controls -->
+        <section class="hud-panel hud-bottom-right" aria-label="System Configuration Controls">
+            <div class="panel-header">
+                <span class="panel-title">MEGASTRUCTURE CONTROLS</span>
+                <button class="panel-toggle-btn" id="toggle-controls-btn" type="button">MINIMIZE</button>
+            </div>
+            <div class="panel-body" id="controls-body">
+                <!-- A. System Configuration -->
+                <div class="control-group">
+                    <div class="control-header">
+                        <span class="control-label">Architecture Mode</span>
+                        <span class="control-readout" id="ctrl-mode-tag">Plausible Orbiters</span>
+                    </div>
+                    <div class="segmented-control" role="radiogroup" aria-label="System Configuration">
+                        <button class="seg-btn active" id="mode-swarm-btn" type="button" data-mode="swarm">Dyson
+                            Swarm</button>
+                        <button class="seg-btn" id="mode-shell-btn" type="button" data-mode="shell">Dyson Shell</button>
+                    </div>
+                </div>
+
+                <!-- B. Collector Density -->
+                <div class="control-group">
+                    <div class="control-header">
+                        <label class="control-label" for="density-slider">Collector Density</label>
+                        <span class="control-readout" id="density-readout">1,600 Units</span>
+                    </div>
+                    <input type="range" id="density-slider" min="300" max="3600" step="50" value="1600" />
+                </div>
+
+                <!-- C. Orbital Radius -->
+                <div class="control-group">
+                    <div class="control-header">
+                        <label class="control-label" for="radius-slider">Orbital Radius</label>
+                        <span class="control-readout" id="radius-readout">1.00 AU</span>
+                    </div>
+                    <input type="range" id="radius-slider" min="0.60" max="1.75" step="0.01" value="1.00" />
+                </div>
+
+                <!-- D. Star Intensity -->
+                <div class="control-group">
+                    <div class="control-header">
+                        <label class="control-label" for="intensity-slider">Star Intensity</label>
+                        <span class="control-readout" id="intensity-readout">1.00 L☉</span>
+                    </div>
+                    <input type="range" id="intensity-slider" min="0.40" max="2.20" step="0.02" value="1.00" />
+                </div>
+
+                <!-- E & F. Collector Motion & Orbital Paths -->
+                <div class="toggle-row">
+                    <button class="toggle-pill active" id="motion-toggle-btn" type="button">
+                        <span>Collector Motion</span>
+                        <span class="toggle-indicator"></span>
+                    </button>
+                    <button class="toggle-pill active" id="orbits-toggle-btn" type="button">
+                        <span>Orbital Paths</span>
+                        <span class="toggle-indicator"></span>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Restore UI Button when UI is hidden -->
+    <button class="icon-btn active" id="restore-ui-btn" type="button">SHOW UI [H]</button>
+
+    <!-- Single Stable Three.js Dependency -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        (function () {
+            'use strict';
+
+            /* ==========================================================================
+             * 1. MOBILE-FIRST PERFORMANCE ADAPTATION & APPLICATION STATE
+             * ========================================================================== */
+            function detectPerformanceProfile() {
+                var width = window.innerWidth || 1024;
+                var height = window.innerHeight || 768;
+                var hasCoarsePointer = window.matchMedia &&
+                    window.matchMedia('(pointer: coarse)').matches;
+                var isSmallScreen = Math.min(width, height) < 768 || hasCoarsePointer;
+                var cores = navigator.hardwareConcurrency || 4;
+                var deviceMemory = navigator.deviceMemory || 4;
+                var prefersReducedMotion = window.matchMedia &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+                var isLowTier = isSmallScreen && (cores <= 4 || deviceMemory <= 4);
+                var rawDpr = window.devicePixelRatio || 1;
+                // Cap mobile pixel ratio strictly at 1.0 to avoid tile-GPU fill-rate bottlenecks
+                var maxPixelRatio = isSmallScreen ? 1.0 : Math.min(rawDpr, 1.35);
+
+                return {
+                    isMobile: isSmallScreen,
+                    isLowTier: isLowTier,
+                    pixelRatio: maxPixelRatio,
+                    // Keep collector counts visually rich while bounded for mobile GPUs
+                    maxCollectors: isLowTier ? 1800 : (isSmallScreen ? 2400 : 3600),
+                    defaultCollectors: isLowTier ? 1100 : (isSmallScreen ? 1300 : 1600),
+                    starCount: isLowTier ? 600 : (isSmallScreen ? 900 : 1600),
+                    prefersReducedMotion: Boolean(prefersReducedMotion)
+                };
+            }
+
+            var profile = detectPerformanceProfile();
+
+            var appState = {
+                mode: 'swarm', // 'swarm' | 'shell'
+                collectorCount: profile.defaultCollectors,
+                maxCollectors: profile.maxCollectors,
+                orbitalRadius: 1.0,      // Normalized AU (1.0 AU = 6.5 scene units)
+                starIntensity: 1.0,      // Normalized solar luminosity L_sun
+                collectorMotion: !profile.prefersReducedMotion,
+                showOrbitalPaths: true,
+                autoRotate: !profile.prefersReducedMotion,
+                paused: false,
+                uiHidden: false,
+                tabHidden: Boolean(document.hidden),
+                needsRender: true,
+                collectorsDirty: true
+            };
+
+            var BASE_ORBIT_SCENE_UNITS = 6.5;
+            var SOLAR_LUMINOSITY_WATTS = 3.828e26;
+
+            /* ==========================================================================
+             * 2. TELEMETRY & EDUCATIONAL ENERGY MODEL
+             * ========================================================================== */
+            function computeTelemetry(state) {
+                var r = Math.max(0.2, state.orbitalRadius);
+                var sphereArea = 4.0 * Math.PI * r * r;
+
+                var perUnitArea = state.mode === 'swarm' ? 0.001115 : 0.00335;
+                var effectiveCollectorArea = state.collectorCount * perUnitArea;
+
+                var rawFraction = effectiveCollectorArea / sphereArea;
+                var maxClamp = state.mode === 'swarm' ? 0.78 : 0.985;
+                var capturedFraction = Math.min(maxClamp, Math.max(0.0001, rawFraction));
+
+                var totalStarWatts = SOLAR_LUMINOSITY_WATTS * state.starIntensity;
+                var capturedWatts = totalStarWatts * capturedFraction;
+
+                var kardashevIndex = (Math.log10(Math.max(1e6, capturedWatts)) - 6.0) / 10.0;
+
+                return {
+                    capturedFraction: capturedFraction,
+                    capturedWatts: capturedWatts,
+                    kardashevIndex: kardashevIndex
+                };
+            }
+
+            function formatScientificWatts(watts) {
+                var exp = Math.floor(Math.log10(watts));
+                var mantissa = watts / Math.pow(10, exp);
+                var superscripts = {
+                    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+                    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+                };
+                var expStr = String(exp).split('').map(function (c) {
+                    return superscripts[c] || c;
+                }).join('');
+                return mantissa.toFixed(2) + ' × 10' + expStr + ' W';
+            }
+
+            /* ==========================================================================
+             * 3. CAMERA CONTROLLER (SMOOTH SPHERICAL ORBIT + TOUCH PINCH + DAMPING)
+             * ========================================================================== */
+            function createCameraController(canvas, onCameraChange) {
+                var DEFAULT_THETA = 0.62;
+                var DEFAULT_PHI = 1.18;
+                var DEFAULT_DISTANCE = 13.8;
+
+                var controller = {
+                    theta: DEFAULT_THETA,
+                    phi: DEFAULT_PHI,
+                    distance: DEFAULT_DISTANCE,
+                    targetTheta: DEFAULT_THETA,
+                    targetPhi: DEFAULT_PHI,
+                    targetDistance: DEFAULT_DISTANCE,
+                    minDistance: 4.4,
+                    maxDistance: 27.0,
+                    minPhi: 0.14,
+                    maxPhi: Math.PI - 0.14,
+                    isDragging: false,
+                    lastInteractionTime: 0,
+                    activePointers: new Map(),
+                    lastPinchDist: 0,
+
+                    reset: function () {
+                        this.targetTheta = DEFAULT_THETA;
+                        this.targetPhi = DEFAULT_PHI;
+                        this.targetDistance = DEFAULT_DISTANCE;
+                        onCameraChange();
+                    },
+
+                    zoomStep: function (deltaFactor) {
+                        this.targetDistance = Math.max(
+                            this.minDistance,
+                            Math.min(this.maxDistance, this.targetDistance * deltaFactor)
+                        );
+                        this.lastInteractionTime = performance.now();
+                        onCameraChange();
+                    },
+
+                    update: function (dt, autoRotateActive) {
+                        var now = performance.now();
+                        var timeSinceInteract = now - this.lastInteractionTime;
+
+                        if (autoRotateActive && !this.isDragging && timeSinceInteract > 1200) {
+                            this.targetTheta += dt * 0.085;
+                        }
+
+                        var smoothing = 1.0 - Math.exp(-12.0 * dt);
+                        var dTheta = this.targetTheta - this.theta;
+                        var dPhi = this.targetPhi - this.phi;
+                        var dDist = this.targetDistance - this.distance;
+
+                        this.theta += dTheta * smoothing;
+                        this.phi += dPhi * smoothing;
+                        this.distance += dDist * smoothing;
+
+                        var stillMoving =
+                            Math.abs(dTheta) > 0.00008 ||
+                            Math.abs(dPhi) > 0.00008 ||
+                            Math.abs(dDist) > 0.0005;
+
+                        return stillMoving;
+                    },
+
+                    getCartesianPosition: function () {
+                        var sinPhi = Math.sin(this.phi);
+                        return {
+                            x: this.distance * sinPhi * Math.sin(this.theta),
+                            y: this.distance * Math.cos(this.phi),
+                            z: this.distance * sinPhi * Math.cos(this.theta)
+                        };
+                    }
+                };
+
+                function onPointerDown(e) {
+                    controller.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                    controller.isDragging = true;
+                    controller.lastInteractionTime = performance.now();
+                    if (canvas.setPointerCapture) {
+                        try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
+                    }
+                    if (controller.activePointers.size === 2) {
+                        var pts = Array.from(controller.activePointers.values());
+                        controller.lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                    }
+                    onCameraChange();
+                }
+
+                function onPointerMove(e) {
+                    if (!controller.activePointers.has(e.pointerId)) return;
+                    var prev = controller.activePointers.get(e.pointerId);
+                    var curr = { x: e.clientX, y: e.clientY };
+                    controller.activePointers.set(e.pointerId, curr);
+                    controller.lastInteractionTime = performance.now();
+
+                    if (controller.activePointers.size === 1) {
+                        var dx = curr.x - prev.x;
+                        var dy = curr.y - prev.y;
+                        var rotSpeed = 0.0055;
+                        controller.targetTheta -= dx * rotSpeed;
+                        controller.targetPhi = Math.max(
+                            controller.minPhi,
+                            Math.min(controller.maxPhi, controller.targetPhi - dy * rotSpeed)
+                        );
+                        onCameraChange();
+                    } else if (controller.activePointers.size === 2) {
+                        var pts = Array.from(controller.activePointers.values());
+                        var dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                        if (controller.lastPinchDist > 10) {
+                            var ratio = controller.lastPinchDist / Math.max(10, dist);
+                            controller.targetDistance = Math.max(
+                                controller.minDistance,
+                                Math.min(controller.maxDistance, controller.targetDistance * ratio)
+                            );
+                            onCameraChange();
+                        }
+                        controller.lastPinchDist = dist;
+                    }
+                }
+
+                function onPointerUpOrCancel(e) {
+                    controller.activePointers.delete(e.pointerId);
+                    if (controller.activePointers.size < 2) {
+                        controller.lastPinchDist = 0;
+                    }
+                    if (controller.activePointers.size === 0) {
+                        controller.isDragging = false;
+                    }
+                    controller.lastInteractionTime = performance.now();
+                }
+
+                function onWheel(e) {
+                    e.preventDefault();
+                    var factor = e.deltaY > 0 ? 1.08 : 0.925;
+                    controller.zoomStep(factor);
+                }
+
+                canvas.addEventListener('pointerdown', onPointerDown);
+                canvas.addEventListener('pointermove', onPointerMove);
+                canvas.addEventListener('pointerup', onPointerUpOrCancel);
+                canvas.addEventListener('pointercancel', onPointerUpOrCancel);
+                canvas.addEventListener('wheel', onWheel, { passive: false });
+
+                controller.dispose = function () {
+                    canvas.removeEventListener('pointerdown', onPointerDown);
+                    canvas.removeEventListener('pointermove', onPointerMove);
+                    canvas.removeEventListener('pointerup', onPointerUpOrCancel);
+                    canvas.removeEventListener('pointercancel', onPointerUpOrCancel);
+                    canvas.removeEventListener('wheel', onWheel);
+                };
+
+                return controller;
+            }
+
+            /* ==========================================================================
+             * 4. ORBITAL & GEOMETRY PRECOMPUTATION (SHARED BY WEBGL & 2D FALLBACK)
+             * ========================================================================== */
+            function generateOrbitalDataset(maxCount) {
+                var data = {
+                    swarmRadiusRatio: new Float32Array(maxCount),
+                    swarmCosInc: new Float32Array(maxCount),
+                    swarmSinInc: new Float32Array(maxCount),
+                    swarmCosNode: new Float32Array(maxCount),
+                    swarmSinNode: new Float32Array(maxCount),
+                    swarmPhase: new Float32Array(maxCount),
+                    swarmSpeed: new Float32Array(maxCount),
+                    swarmScale: new Float32Array(maxCount),
+                    swarmIsNode: new Uint8Array(maxCount),
+
+                    shellTheta: new Float32Array(maxCount),
+                    shellSinPhi: new Float32Array(maxCount),
+                    shellCosPhi: new Float32Array(maxCount),
+                    shellRadiusOffset: new Float32Array(maxCount),
+                    shellScale: new Float32Array(maxCount)
+                };
+
+                var bandCount = 16;
+                var bandInclinations = new Float32Array(bandCount);
+                var bandNodes = new Float32Array(bandCount);
+                var bandRadii = new Float32Array(bandCount);
+
+                for (var b = 0; b < bandCount; b++) {
+                    var t = b / bandCount;
+                    bandInclinations[b] = (t - 0.5) * Math.PI * 0.86 + Math.sin(b * 2.1) * 0.12;
+                    bandNodes[b] = (b * Math.PI * 2.0) / bandCount + 0.35;
+                    bandRadii[b] = 0.84 + (b % 5) * 0.075 + Math.cos(b * 1.7) * 0.03;
+                }
+
+                var goldenAngle = Math.PI * (3.0 - Math.sqrt(5.0));
+
+                for (var i = 0; i < maxCount; i++) {
+                    var inStream = (i % 9) !== 0;
+                    var band = i % bandCount;
+                    var inc, node;
+
+                    if (inStream) {
+                        var streamSpread = ((i * 73) % 100) / 100.0 - 0.5;
+                        data.swarmRadiusRatio[i] = bandRadii[band] + streamSpread * 0.055;
+                        inc = bandInclinations[band] + streamSpread * 0.045;
+                        node = bandNodes[band] + streamSpread * 0.04;
+                    } else {
+                        var u = ((i * 37) % 1000) / 1000.0;
+                        data.swarmRadiusRatio[i] = 0.88 + ((i * 19) % 100) / 360.0;
+                        inc = (u - 0.5) * Math.PI * 0.92;
+                        node = i * goldenAngle;
+                    }
+
+                    // Precompute trig values so the per-frame loop avoids Math.sin/cos on static angles
+                    data.swarmCosInc[i] = Math.cos(inc);
+                    data.swarmSinInc[i] = Math.sin(inc);
+                    data.swarmCosNode[i] = Math.cos(node);
+                    data.swarmSinNode[i] = Math.sin(node);
+
+                    data.swarmPhase[i] = (i * goldenAngle) % (Math.PI * 2.0);
+                    var rRatio = data.swarmRadiusRatio[i];
+                    var dir = (band % 4 === 3) ? -1.0 : 1.0;
+                    data.swarmSpeed[i] = dir * (0.14 / Math.pow(rRatio, 1.5)) * (0.9 + ((i * 13) % 20) * 0.01);
+
+                    var isMajorNode = (i % 26 === 0);
+                    data.swarmIsNode[i] = isMajorNode ? 1 : 0;
+                    data.swarmScale[i] = isMajorNode
+                        ? 1.65
+                        : (0.72 + ((i * 29) % 100) / 160.0);
+
+                    // Shell lattice
+                    var permutedIdx = (i * 499) % maxCount;
+                    var yNorm = 1.0 - (permutedIdx / (maxCount - 1)) * 2.0;
+                    if (Math.abs(yNorm) > 0.94) {
+                        yNorm = yNorm > 0 ? 0.94 : -0.94;
+                    } else if (Math.abs(yNorm) < 0.028) {
+                        yNorm = yNorm >= 0 ? 0.028 : -0.028;
+                    }
+
+                    var phi = Math.acos(Math.max(-1.0, Math.min(1.0, yNorm)));
+                    data.shellSinPhi[i] = Math.sin(phi);
+                    data.shellCosPhi[i] = Math.cos(phi);
+                    data.shellTheta[i] = permutedIdx * goldenAngle;
+
+                    var shellLayer = (i % 7 === 0) ? 1.035 : ((i % 2 === 0) ? 1.0 : 0.982);
+                    data.shellRadiusOffset[i] = shellLayer;
+                    data.shellScale[i] = (i % 7 === 0) ? 1.45 : 1.25;
+                }
+
+                data.bandCount = bandCount;
+                data.bandInclinations = bandInclinations;
+                data.bandNodes = bandNodes;
+                data.bandRadii = bandRadii;
+                return data;
+            }
+
+            // Preallocate for maximum desktop ceiling (3600) once
+            var MAX_POOL_SIZE = 3600;
+            var orbitalData = generateOrbitalDataset(MAX_POOL_SIZE);
+
+            /* ==========================================================================
+             * 5. OPTIMIZED THREE.JS WEBGL SCENE BUILDER (5-6 TOTAL DRAW CALLS)
+             * ========================================================================== */
+            function createWebGLScene(canvas) {
+                if (typeof THREE === 'undefined') {
+                    return null;
+                }
+
+                var renderer;
+                try {
+                    renderer = new THREE.WebGLRenderer({
+                        canvas: canvas,
+                        // Disable MSAA on mobile devices to save tile-buffer bandwidth
+                        antialias: !profile.isMobile,
+                        powerPreference: 'high-performance',
+                        alpha: false,
+                        stencil: false
+                    });
+                } catch (err) {
+                    return null;
+                }
+
+                renderer.setPixelRatio(profile.pixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setClearColor(0x03050a, 1);
+
+                var scene = new THREE.Scene();
+                var camera = new THREE.PerspectiveCamera(
+                    46,
+                    window.innerWidth / Math.max(1, window.innerHeight),
+                    0.1,
+                    260
+                );
+
+                var backgroundGroup = new THREE.Group();
+                var systemGroup = new THREE.Group();
+                scene.add(backgroundGroup);
+                scene.add(systemGroup);
+
+                /* ------------------------------------------------------------------------
+                 * 5A. VERTEX-SHADED DEEP SPACE NEBULA DOME (ZERO PER-PIXEL NOISE LOOPS)
+                 * ------------------------------------------------------------------------ */
+                var nebulaGeo = new THREE.SphereGeometry(120, 24, 16);
+                var nebulaMat = new THREE.ShaderMaterial({
+                    side: THREE.BackSide,
+                    depthWrite: false,
+                    precision: 'mediump',
+                    vertexShader: [
+                        'varying vec3 vNebulaColor;',
+                        'void main() {',
+                        '  vec3 dir = normalize(position);',
+                        '  float galacticBand = exp(-abs(dir.y + 0.16 * sin(dir.x * 2.4)) * 3.0);',
+                        '  float waveA = 0.5 + 0.5 * sin(dir.x * 3.2 + dir.z * 2.1);',
+                        '  float waveB = 0.5 + 0.5 * cos(dir.z * 4.1 - dir.y * 2.7);',
+                        '  vec3 baseSpace = vec3(0.012, 0.020, 0.042);',
+                        '  vec3 indigoNebula = vec3(0.08, 0.13, 0.30) * waveA * (0.4 + 0.6 * galacticBand);',
+                        '  vec3 violetNebula = vec3(0.19, 0.09, 0.32) * waveB * galacticBand;',
+                        '  vec3 cyanWisp = vec3(0.04, 0.20, 0.34) * (waveA * waveB) * galacticBand;',
+                        '  vNebulaColor = baseSpace + indigoNebula * 0.55 + violetNebula * 0.45 + cyanWisp * 0.4;',
+                        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'precision mediump float;',
+                        'varying vec3 vNebulaColor;',
+                        'void main() {',
+                        '  gl_FragColor = vec4(vNebulaColor, 1.0);',
+                        '}'
+                    ].join('\n')
+                });
+                var nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
+                backgroundGroup.add(nebulaMesh);
+
+                // Procedural Starfield Points (Reduced particle count for mobile)
+                var starCount = profile.starCount;
+                var starPositions = new Float32Array(starCount * 3);
+                var starColors = new Float32Array(starCount * 3);
+                var starSizes = new Float32Array(starCount);
+
+                for (var s = 0; s < starCount; s++) {
+                    var u = Math.random();
+                    var v = Math.random();
+                    var theta = u * 2.0 * Math.PI;
+                    var phi = Math.acos(2.0 * v - 1.0);
+                    var rad = 65.0 + Math.random() * 45.0;
+
+                    starPositions[s * 3] = rad * Math.sin(phi) * Math.cos(theta);
+                    starPositions[s * 3 + 1] = rad * Math.cos(phi);
+                    starPositions[s * 3 + 2] = rad * Math.sin(phi) * Math.sin(theta);
+
+                    var tint = Math.random();
+                    if (tint < 0.55) {
+                        starColors[s * 3] = 0.82;
+                        starColors[s * 3 + 1] = 0.90;
+                        starColors[s * 3 + 2] = 1.0;
+                    } else if (tint < 0.85) {
+                        starColors[s * 3] = 0.98;
+                        starColors[s * 3 + 1] = 0.96;
+                        starColors[s * 3 + 2] = 0.92;
+                    } else {
+                        starColors[s * 3] = 1.0;
+                        starColors[s * 3 + 1] = 0.82;
+                        starColors[s * 3 + 2] = 0.58;
+                    }
+
+                    var isBright = Math.random() < 0.07;
+                    starSizes[s] = isBright ? (2.2 + Math.random() * 1.5) : (0.85 + Math.random() * 1.15);
+                }
+
+                var starsGeo = new THREE.BufferGeometry();
+                starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+                starsGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+                starsGeo.setAttribute('aSize', new THREE.BufferAttribute(starSizes, 1));
+
+                var starsMat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    vertexColors: true,
+                    precision: 'mediump',
+                    uniforms: {
+                        uPixelRatio: { value: profile.pixelRatio },
+                        uTime: { value: 0 }
+                    },
+                    vertexShader: [
+                        'attribute float aSize;',
+                        'varying vec3 vColor;',
+                        'uniform float uPixelRatio;',
+                        'uniform float uTime;',
+                        'void main() {',
+                        '  float seed = position.x * 0.13 + position.y * 0.27;',
+                        '  float twinkle = 0.84 + 0.16 * sin(uTime * 1.3 + seed * 10.0);',
+                        '  vColor = color * twinkle;',
+                        '  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);',
+                        '  gl_PointSize = aSize * uPixelRatio * (110.0 / -mvPosition.z);',
+                        '  gl_Position = projectionMatrix * mvPosition;',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'precision mediump float;',
+                        'varying vec3 vColor;',
+                        'void main() {',
+                        '  vec2 uv = gl_PointCoord - vec2(0.5);',
+                        '  float d2 = dot(uv, uv);',
+                        '  if (d2 > 0.25) discard;',
+                        '  float alpha = (0.25 - d2) * 3.6;',
+                        '  gl_FragColor = vec4(vColor, alpha);',
+                        '}'
+                    ].join('\n')
+                });
+
+                var starFieldPoints = new THREE.Points(starsGeo, starsMat);
+                backgroundGroup.add(starFieldPoints);
+
+                /* ------------------------------------------------------------------------
+                 * 5B. LIGHTWEIGHT CENTRAL STAR + SINGLE UNIFIED CORONA SHELL (2 DRAW CALLS)
+                 * ------------------------------------------------------------------------ */
+                var starGroup = new THREE.Group();
+                systemGroup.add(starGroup);
+
+                var starRadius = 1.95;
+                var starGeo = new THREE.SphereGeometry(starRadius, 32, 32);
+                var starMat = new THREE.ShaderMaterial({
+                    precision: 'mediump',
+                    uniforms: {
+                        uTime: { value: 0 },
+                        uIntensity: { value: appState.starIntensity }
+                    },
+                    vertexShader: [
+                        'varying vec3 vNormal;',
+                        'varying vec3 vPosition;',
+                        'varying vec3 vViewPosition;',
+                        'void main() {',
+                        '  vNormal = normalize(normalMatrix * normal);',
+                        '  vPosition = normalize(position);',
+                        '  vec4 mvPos = modelViewMatrix * vec4(position, 1.0);',
+                        '  vViewPosition = -mvPos.xyz;',
+                        '  gl_Position = projectionMatrix * mvPos;',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'precision mediump float;',
+                        'varying vec3 vNormal;',
+                        'varying vec3 vPosition;',
+                        'varying vec3 vViewPosition;',
+                        'uniform float uTime;',
+                        'uniform float uIntensity;',
+                        'void main() {',
+                        '  vec3 viewDir = normalize(vViewPosition);',
+                        '  float mu = clamp(dot(normalize(vNormal), viewDir), 0.0, 1.0);',
+                        '  vec3 p = vPosition * 7.0;',
+                        '  float t = uTime * 0.22;',
+                        '  float g1 = sin(p.x * 2.2 + t) * cos(p.y * 2.4 - t) * sin(p.z * 2.1 + t * 0.7);',
+                        '  float g2 = cos(p.x * 4.5 - t * 1.2) * sin(p.y * 4.2 + p.z * 4.3);',
+                        '  float granules = 0.5 + 0.32 * g1 + 0.18 * g2;',
+                        '  vec3 coreWhite = vec3(1.0, 0.99, 0.94);',
+                        '  vec3 warmGold = vec3(1.0, 0.80, 0.42);',
+                        '  vec3 limbAmber = vec3(0.92, 0.46, 0.12);',
+                        '  vec3 baseCol = mix(limbAmber, warmGold, sqrt(mu));',
+                        '  baseCol = mix(baseCol, coreWhite, mu * mu * (0.68 + 0.32 * granules));',
+                        '  float brightness = 0.72 + 0.32 * sqrt(uIntensity);',
+                        '  gl_FragColor = vec4(clamp(baseCol * brightness, 0.0, 1.0), 1.0);',
+                        '}'
+                    ].join('\n')
+                });
+
+                var starMesh = new THREE.Mesh(starGeo, starMat);
+                starGroup.add(starMesh);
+
+                // Single Consolidated Dual-Falloff Atmospheric Corona (Replaces 2 corona spheres + 5 arc meshes)
+                var coronaGeo = new THREE.SphereGeometry(starRadius * 2.05, 28, 28);
+                var coronaMat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    side: THREE.BackSide,
+                    blending: THREE.AdditiveBlending,
+                    precision: 'mediump',
+                    uniforms: {
+                        uIntensity: { value: appState.starIntensity },
+                        uTime: { value: 0 }
+                    },
+                    vertexShader: [
+                        'varying vec3 vNormal;',
+                        'varying vec3 vViewDir;',
+                        'void main() {',
+                        '  vNormal = normalize(normalMatrix * normal);',
+                        '  vec4 mvPos = modelViewMatrix * vec4(position, 1.0);',
+                        '  vViewDir = normalize(-mvPos.xyz);',
+                        '  gl_Position = projectionMatrix * mvPos;',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'precision mediump float;',
+                        'varying vec3 vNormal;',
+                        'varying vec3 vViewDir;',
+                        'uniform float uIntensity;',
+                        'uniform float uTime;',
+                        'void main() {',
+                        '  float d = clamp(dot(-vNormal, vViewDir), 0.0, 1.0);',
+                        '  float d2 = d * d;',
+                        '  float innerGlow = d2 * d * 0.56;',
+                        '  float outerGlow = d2 * d2 * 0.30;',
+                        '  float pulse = 0.96 + 0.04 * sin(uTime * 1.3);',
+                        '  vec3 col = mix(vec3(0.95, 0.48, 0.14), vec3(1.0, 0.90, 0.64), d2);',
+                        '  float scale = clamp(0.55 + 0.45 * uIntensity, 0.4, 1.45);',
+                        '  float alpha = (innerGlow + outerGlow) * pulse * scale;',
+                        '  gl_FragColor = vec4(col, alpha);',
+                        '}'
+                    ].join('\n')
+                });
+                var starCorona = new THREE.Mesh(coronaGeo, coronaMat);
+                starGroup.add(starCorona);
+
+                /* ------------------------------------------------------------------------
+                 * 5C. DYSON COLLECTORS (6-TRIANGLE HEXAGONAL INSTANCED MESH)
+                 * ------------------------------------------------------------------------ */
+                // Flat 6-segment hexagonal disc (6 triangles instead of 24 on a capped cylinder)
+                var collectorGeo = new THREE.CircleGeometry(0.14, 6);
+
+                var collectorMat = new THREE.ShaderMaterial({
+                    side: THREE.DoubleSide,
+                    precision: 'mediump',
+                    uniforms: {
+                        uStarIntensity: { value: appState.starIntensity },
+                        uTime: { value: 0 }
+                    },
+                    vertexShader: [
+                        'attribute float aPhase;',
+                        'attribute float aNodeFlag;',
+                        'varying vec3 vWorldPos;',
+                        'varying vec3 vWorldNormal;',
+                        'varying float vPhase;',
+                        'varying float vNodeFlag;',
+                        'void main() {',
+                        '  vPhase = aPhase;',
+                        '  vNodeFlag = aNodeFlag;',
+                        '  vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);',
+                        '  vWorldPos = worldPosition.xyz;',
+                        '  vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);',
+                        '  gl_Position = projectionMatrix * viewMatrix * worldPosition;',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'precision mediump float;',
+                        'varying vec3 vWorldPos;',
+                        'varying vec3 vWorldNormal;',
+                        'varying float vPhase;',
+                        'varying float vNodeFlag;',
+                        'uniform float uStarIntensity;',
+                        'uniform float uTime;',
+                        'void main() {',
+                        '  vec3 N = normalize(vWorldNormal);',
+                        '  vec3 toStar = normalize(-vWorldPos);',
+                        '  vec3 toCam = normalize(cameraPosition - vWorldPos);',
+                        '  float ndotl = abs(dot(N, toStar));',
+                        '  vec3 H = normalize(toStar + toCam);',
+                        '  float ndoth = max(0.0, abs(dot(N, H)));',
+                        '  float ndoth2 = ndoth * ndoth;',
+                        '  float spec = MathSpec;',
+                        '  float rim = 1.0 - max(0.0, abs(dot(N, toCam)));',
+                        '  rim = rim * rim;',
+                        '  float glint = 0.85 + 0.15 * sin(uTime * 1.8 + vPhase * 6.2831);',
+                        '  vec3 coolShadow = vec3(0.06, 0.13, 0.25);',
+                        '  vec3 warmLit = vec3(0.96, 0.76, 0.42);',
+                        '  vec3 cyanEdge = vec3(0.18, 0.72, 0.96);',
+                        '  vec3 goldSpec = vec3(1.0, 0.92, 0.68);',
+                        '  float intensityScale = clamp(0.55 + 0.45 * uStarIntensity, 0.4, 1.6);',
+                        '  vec3 col = mix(coolShadow, warmLit, ndotl * 0.78 * intensityScale);',
+                        '  col += goldSpec * spec * 0.95 * glint * intensityScale;',
+                        '  col += cyanEdge * rim * 0.26;',
+                        '  col += vec3(0.95, 0.62, 0.15) * (0.28 * glint * vNodeFlag);',
+                        '  gl_FragColor = vec4(col, 1.0);',
+                        '}'
+                    ].join('\n').replace('MathSpec', 'ndoth2 * ndoth2 * ndoth2 * ndoth2 * ndoth2 * ndoth2')
+                });
+
+                var instancedCollectors = new THREE.InstancedMesh(
+                    collectorGeo,
+                    collectorMat,
+                    MAX_POOL_SIZE
+                );
+                instancedCollectors.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+                var phaseAttr = new THREE.InstancedBufferAttribute(orbitalData.swarmPhase, 1);
+                var nodeFlagAttr = new THREE.InstancedBufferAttribute(
+                    new Float32Array(orbitalData.swarmIsNode),
+                    1
+                );
+                collectorGeo.setAttribute('aPhase', phaseAttr);
+                collectorGeo.setAttribute('aNodeFlag', nodeFlagAttr);
+
+                systemGroup.add(instancedCollectors);
+
+                /* ------------------------------------------------------------------------
+                 * 5D. ORBITAL GUIDE LINES (1 DRAW CALL)
+                 * ------------------------------------------------------------------------ */
+                var orbitLinesGroup = new THREE.Group();
+                systemGroup.add(orbitLinesGroup);
+
+                var segmentsPerRing = 72;
+                var ringPositions = [];
+                for (var b = 0; b < orbitalData.bandCount; b++) {
+                    var inc = orbitalData.bandInclinations[b];
+                    var node = orbitalData.bandNodes[b];
+                    var rRatio = orbitalData.bandRadii[b];
+
+                    var cosNode = Math.cos(node);
+                    var sinNode = Math.sin(node);
+                    var cosInc = Math.cos(inc);
+                    var sinInc = Math.sin(inc);
+
+                    for (var sIdx = 0; sIdx < segmentsPerRing; sIdx++) {
+                        var a1 = (sIdx / segmentsPerRing) * Math.PI * 2.0;
+                        var a2 = ((sIdx + 1) / segmentsPerRing) * Math.PI * 2.0;
+
+                        var x1 = rRatio * Math.cos(a1);
+                        var z1 = rRatio * Math.sin(a1);
+                        var x2 = rRatio * Math.cos(a2);
+                        var z2 = rRatio * Math.sin(a2);
+
+                        var y1 = -z1 * sinInc;
+                        var z1Inc = z1 * cosInc;
+                        var wx1 = x1 * cosNode + z1Inc * sinNode;
+                        var wz1 = -x1 * sinNode + z1Inc * cosNode;
+
+                        var y2 = -z2 * sinInc;
+                        var z2Inc = z2 * cosInc;
+                        var wx2 = x2 * cosNode + z2Inc * sinNode;
+                        var wz2 = -x2 * sinNode + z2Inc * cosNode;
+
+                        ringPositions.push(wx1, y1, wz1, wx2, y2, wz2);
+                    }
+                }
+
+                var orbitLinesGeo = new THREE.BufferGeometry();
+                orbitLinesGeo.setAttribute(
+                    'position',
+                    new THREE.Float32BufferAttribute(ringPositions, 3)
+                );
+                var orbitLinesMat = new THREE.LineBasicMaterial({
+                    color: 0x3ce6ff,
+                    transparent: true,
+                    opacity: 0.16,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                var orbitLinesMesh = new THREE.LineSegments(orbitLinesGeo, orbitLinesMat);
+                orbitLinesGroup.add(orbitLinesMesh);
+
+                /* ------------------------------------------------------------------------
+                 * 5E. FAST INLINE MATRIX BUFFER UPDATER WITH DIRTY-FLAG SKIPPING
+                 * ------------------------------------------------------------------------ */
+                var elapsedOrbitalTime = 0;
+                var modeBlend = 0;
+
+                function updateCollectorsTransform(dt) {
+                    var motionActive = !appState.paused && appState.collectorMotion;
+                    if (motionActive) {
+                        elapsedOrbitalTime += dt;
+                    }
+
+                    var targetBlend = appState.mode === 'shell' ? 1.0 : 0.0;
+                    var isMorphing = Math.abs(targetBlend - modeBlend) > 0.001;
+                    if (isMorphing) {
+                        var blendStep = 1.0 - Math.exp(-6.5 * dt);
+                        modeBlend += (targetBlend - modeBlend) * blendStep;
+                        if (Math.abs(targetBlend - modeBlend) <= 0.001) {
+                            modeBlend = targetBlend;
+                            isMorphing = false;
+                        }
+                    }
+
+                    var count = appState.collectorCount;
+                    instancedCollectors.count = count;
+                    var baseRadius = appState.orbitalRadius * BASE_ORBIT_SCENE_UNITS;
+
+                    // Update orbital guide lines visibility & scale
+                    orbitLinesGroup.visible = appState.showOrbitalPaths;
+                    var orbitLineScale = baseRadius * (1.0 - 0.12 * modeBlend);
+                    orbitLinesMesh.scale.set(orbitLineScale, orbitLineScale, orbitLineScale);
+                    orbitLinesMat.opacity = appState.mode === 'shell' ? 0.09 : 0.16;
+
+                    // Skip CPU matrix loop and GPU buffer upload if collectors are stationary
+                    if (!motionActive && !isMorphing && !appState.collectorsDirty) {
+                        return false;
+                    }
+                    appState.collectorsDirty = false;
+
+                    var matArray = instancedCollectors.instanceMatrix.array;
+                    var invBlend = 1.0 - modeBlend;
+                    var shellTimeOffset = elapsedOrbitalTime * 0.045;
+
+                    for (var i = 0; i < count; i++) {
+                        var px, py, pz;
+
+                        if (modeBlend < 0.999) {
+                            var phase = orbitalData.swarmPhase[i] + elapsedOrbitalTime * orbitalData.swarmSpeed[i];
+                            var rSwarm = baseRadius * orbitalData.swarmRadiusRatio[i];
+                            var lx = rSwarm * Math.cos(phase);
+                            var lz = rSwarm * Math.sin(phase);
+                            var ly = -lz * orbitalData.swarmSinInc[i];
+                            var lzInc = lz * orbitalData.swarmCosInc[i];
+
+                            var sx = lx * orbitalData.swarmCosNode[i] + lzInc * orbitalData.swarmSinNode[i];
+                            var sy = ly;
+                            var sz = -lx * orbitalData.swarmSinNode[i] + lzInc * orbitalData.swarmCosNode[i];
+                            px = sx; py = sy; pz = sz;
+                        } else {
+                            px = 0; py = 0; pz = 0;
+                        }
+
+                        if (modeBlend > 0.001) {
+                            var sinPhi = orbitalData.shellSinPhi[i];
+                            var cosPhi = orbitalData.shellCosPhi[i];
+                            var sTheta = orbitalData.shellTheta[i] + shellTimeOffset;
+                            var rShell = baseRadius * 0.88 * orbitalData.shellRadiusOffset[i];
+
+                            var shx = rShell * sinPhi * Math.cos(sTheta);
+                            var shy = rShell * cosPhi;
+                            var shz = rShell * sinPhi * Math.sin(sTheta);
+
+                            px = px * invBlend + shx * modeBlend;
+                            py = py * invBlend + shy * modeBlend;
+                            pz = pz * invBlend + shz * modeBlend;
+                        }
+
+                        var scaleVal = orbitalData.swarmScale[i] * invBlend +
+                            orbitalData.shellScale[i] * 1.48 * modeBlend;
+
+                        // Construct orthonormal lookAt(0,0,0) basis directly in instanceMatrix buffer
+                        var invLen = 1.0 / (Math.hypot(px, py, pz) || 1.0);
+                        var zx = -px * invLen;
+                        var zy = -py * invLen;
+                        var zz = -pz * invLen;
+
+                        var xx = zz;
+                        var xz = -zx;
+                        var xLen = Math.hypot(xx, xz);
+                        if (xLen < 0.0001) {
+                            xx = 1.0; xz = 0.0;
+                        } else {
+                            var invX = 1.0 / xLen;
+                            xx *= invX; xz *= invX;
+                        }
+
+                        var yx = zy * xz;
+                        var yy = zz * xx - zx * xz;
+                        var yz = -zy * xx;
+
+                        var offset = i * 16;
+                        matArray[offset] = xx * scaleVal;
+                        matArray[offset + 1] = 0.0;
+                        matArray[offset + 2] = xz * scaleVal;
+                        matArray[offset + 3] = 0.0;
+
+                        matArray[offset + 4] = yx * scaleVal;
+                        matArray[offset + 5] = yy * scaleVal;
+                        matArray[offset + 6] = yz * scaleVal;
+                        matArray[offset + 7] = 0.0;
+
+                        matArray[offset + 8] = zx * scaleVal;
+                        matArray[offset + 9] = zy * scaleVal;
+                        matArray[offset + 10] = zz * scaleVal;
+                        matArray[offset + 11] = 0.0;
+
+                        matArray[offset + 12] = px;
+                        matArray[offset + 13] = py;
+                        matArray[offset + 14] = pz;
+                        matArray[offset + 15] = 1.0;
+                    }
+
+                    instancedCollectors.instanceMatrix.needsUpdate = true;
+                    return isMorphing;
+                }
+
+                updateCollectorsTransform(0.016);
+
+                var totalShaderTime = 0;
+
+                return {
+                    type: 'webgl',
+                    renderer: renderer,
+                    updateAndRender: function (dt, camPos) {
+                        if (!appState.paused) {
+                            totalShaderTime += dt;
+                        }
+
+                        starMat.uniforms.uTime.value = totalShaderTime;
+                        starMat.uniforms.uIntensity.value = appState.starIntensity;
+                        coronaMat.uniforms.uTime.value = totalShaderTime;
+                        coronaMat.uniforms.uIntensity.value = appState.starIntensity;
+                        collectorMat.uniforms.uTime.value = totalShaderTime;
+                        collectorMat.uniforms.uStarIntensity.value = appState.starIntensity;
+                        starsMat.uniforms.uTime.value = totalShaderTime;
+
+                        var isMorphing = updateCollectorsTransform(dt);
+
+                        camera.position.set(camPos.x, camPos.y, camPos.z);
+                        camera.lookAt(0, 0, 0);
+
+                        renderer.render(scene, camera);
+                        return isMorphing;
+                    },
+                    resize: function (w, h) {
+                        profile = detectPerformanceProfile();
+                        renderer.setPixelRatio(profile.pixelRatio);
+                        renderer.setSize(w, h);
+                        starsMat.uniforms.uPixelRatio.value = profile.pixelRatio;
+                        camera.aspect = w / Math.max(1, h);
+                        camera.updateProjectionMatrix();
+                    },
+                    dispose: function () {
+                        nebulaGeo.dispose();
+                        nebulaMat.dispose();
+                        starsGeo.dispose();
+                        starsMat.dispose();
+                        starGeo.dispose();
+                        starMat.dispose();
+                        coronaGeo.dispose();
+                        coronaMat.dispose();
+                        collectorGeo.dispose();
+                        collectorMat.dispose();
+                        orbitLinesGeo.dispose();
+                        orbitLinesMat.dispose();
+                        renderer.dispose();
+                    }
+                };
+            }
+
+            /* ==========================================================================
+             * 6. GRACEFUL CANVAS 2D FALLBACK RENDERER
+             * ========================================================================== */
+            function createCanvas2DFallback(canvas) {
+                var ctx = canvas.getContext('2d');
+                var noticeEl = document.getElementById('renderer-notice');
+                if (noticeEl) {
+                    noticeEl.style.display = 'block';
+                }
+
+                var elapsed = 0;
+                var bgStars = [];
+                for (var i = 0; i < 220; i++) {
+                    bgStars.push({
+                        x: Math.random(),
+                        y: Math.random(),
+                        r: 0.6 + Math.random() * 1.3,
+                        a: 0.25 + Math.random() * 0.65
+                    });
+                }
+
+                function resize(w, h) {
+                    var dpr = 1.0;
+                    canvas.width = w * dpr;
+                    canvas.height = h * dpr;
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                }
+
+                resize(window.innerWidth, window.innerHeight);
+
+                return {
+                    type: 'canvas2d',
+                    updateAndRender: function (dt, camPos) {
+                        if (!appState.paused && appState.collectorMotion) {
+                            elapsed += dt;
+                        }
+
+                        var w = window.innerWidth;
+                        var h = window.innerHeight;
+                        var cx = w * 0.5;
+                        var cy = h * 0.5;
+
+                        ctx.fillStyle = '#03060e';
+                        ctx.fillRect(0, 0, w, h);
+
+                        ctx.fillStyle = '#d8e8ff';
+                        for (var s = 0; s < bgStars.length; s++) {
+                            var st = bgStars[s];
+                            ctx.globalAlpha = st.a;
+                            ctx.beginPath();
+                            ctx.arc(st.x * w, st.y * h, st.r, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        ctx.globalAlpha = 1.0;
+
+                        var camDist = Math.hypot(camPos.x, camPos.y, camPos.z);
+                        var scale = Math.min(w, h) * (0.95 / Math.max(4.0, camDist));
+
+                        var fzX = -camPos.x / camDist;
+                        var fzY = -camPos.y / camDist;
+                        var fzZ = -camPos.z / camDist;
+                        var rx = fzZ;
+                        var ry = 0;
+                        var rz = -fzX;
+                        var rLen = Math.hypot(rx, rz) || 1;
+                        rx /= rLen; rz /= rLen;
+                        var ux = fzY * rz;
+                        var uy = fzZ * rx - fzX * rz;
+                        var uz = -fzY * rx;
+
+                        var count = Math.min(appState.collectorCount, 800);
+                        var baseRadius = appState.orbitalRadius * BASE_ORBIT_SCENE_UNITS;
+                        var projected = [];
+
+                        for (var i = 0; i < count; i++) {
+                            var wx, wy, wz;
+                            if (appState.mode === 'swarm') {
+                                var phase = orbitalData.swarmPhase[i] + elapsed * orbitalData.swarmSpeed[i];
+                                var rSwarm = baseRadius * orbitalData.swarmRadiusRatio[i];
+                                var lx = rSwarm * Math.cos(phase);
+                                var lz = rSwarm * Math.sin(phase);
+                                var ly = -lz * orbitalData.swarmSinInc[i];
+                                var lzInc = lz * orbitalData.swarmCosInc[i];
+                                wx = lx * orbitalData.swarmCosNode[i] + lzInc * orbitalData.swarmSinNode[i];
+                                wy = ly;
+                                wz = -lx * orbitalData.swarmSinNode[i] + lzInc * orbitalData.swarmCosNode[i];
+                            } else {
+                                var sinPhi = orbitalData.shellSinPhi[i];
+                                var cosPhi = orbitalData.shellCosPhi[i];
+                                var theta = orbitalData.shellTheta[i] + elapsed * 0.045;
+                                var rShell = baseRadius * 0.88;
+                                wx = rShell * sinPhi * Math.cos(theta);
+                                wy = rShell * cosPhi;
+                                wz = rShell * sinPhi * Math.sin(theta);
+                            }
+
+                            var px = wx * rx + wy * ry + wz * rz;
+                            var py = wx * ux + wy * uy + wz * uz;
+                            var pz = wx * fzX + wy * fzY + wz * fzZ;
+
+                            projected.push({ x: cx + px * scale, y: cy - py * scale, z: pz });
+                        }
+
+                        projected.sort(function (a, b) { return b.z - a.z; });
+
+                        for (var j = 0; j < projected.length; j++) {
+                            var pt = projected[j];
+                            if (pt.z < 0) continue;
+                            ctx.fillStyle = '#2b5f8c';
+                            ctx.fillRect(pt.x - 1.5, pt.y - 1.5, 3, 3);
+                        }
+
+                        var starScreenR = Math.max(14, 1.95 * scale);
+                        var grad = ctx.createRadialGradient(cx, cy, starScreenR * 0.1, cx, cy, starScreenR * 2.4);
+                        grad.addColorStop(0, '#fffdf2');
+                        grad.addColorStop(0.35, '#ffd269');
+                        grad.addColorStop(0.7, 'rgba(245, 140, 35, 0.28)');
+                        grad.addColorStop(1, 'rgba(245, 140, 35, 0)');
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, starScreenR * 2.4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        for (var k = 0; k < projected.length; k++) {
+                            var fpt = projected[k];
+                            if (fpt.z >= 0) continue;
+                            ctx.fillStyle = '#ffd478';
+                            ctx.fillRect(fpt.x - 2, fpt.y - 2, 3.8, 3.8);
+                        }
+
+                        return false;
+                    },
+                    resize: resize,
+                    dispose: function () { }
+                };
+            }
+
+            /* ==========================================================================
+             * 7. INITIALIZE SCENE, UI BINDINGS & DEMAND-DRIVEN FRAME SCHEDULER
+             * ========================================================================== */
+            var canvas = document.getElementById('scene-canvas');
+            var rafId = null;
+            var lastFrameTime = performance.now();
+
+            function scheduleLoop() {
+                if (rafId === null && !appState.tabHidden) {
+                    lastFrameTime = performance.now();
+                    rafId = requestAnimationFrame(animate);
+                }
+            }
+
+            function requestSceneRender(markCollectorsDirty) {
+                appState.needsRender = true;
+                if (markCollectorsDirty) {
+                    appState.collectorsDirty = true;
+                }
+                scheduleLoop();
+            }
+
+            var cameraCtrl = createCameraController(canvas, function () {
+                requestSceneRender(false);
+            });
+
+            var activeRenderer = createWebGLScene(canvas);
+            if (!activeRenderer) {
+                activeRenderer = createCanvas2DFallback(canvas);
+            }
+
+            canvas.addEventListener('webglcontextlost', function (event) {
+                event.preventDefault();
+                if (activeRenderer && activeRenderer.dispose) {
+                    activeRenderer.dispose();
+                }
+                activeRenderer = createCanvas2DFallback(canvas);
+                requestSceneRender(true);
+            });
+
+            canvas.addEventListener('webglcontextrestored', function () {
+                var noticeEl = document.getElementById('renderer-notice');
+                if (noticeEl) noticeEl.style.display = 'none';
+                var restored = createWebGLScene(canvas);
+                if (restored) {
+                    activeRenderer = restored;
+                    requestSceneRender(true);
+                }
+            });
+
+            /* --------------------------------------------------------------------------
+             * UI ELEMENT REFERENCES & SYNCHRONIZATION
+             * -------------------------------------------------------------------------- */
+            var ui = {
+                introOverlay: document.getElementById('intro-overlay'),
+                exploreBtn: document.getElementById('explore-system-btn'),
+                hudLayer: document.getElementById('hud-layer'),
+                restoreUiBtn: document.getElementById('restore-ui-btn'),
+                headerModeLabel: document.getElementById('header-mode-label'),
+
+                zoomInBtn: document.getElementById('zoom-in-btn'),
+                zoomOutBtn: document.getElementById('zoom-out-btn'),
+                resetViewBtn: document.getElementById('reset-view-btn'),
+                autoRotateBtn: document.getElementById('auto-rotate-btn'),
+                pauseBtn: document.getElementById('pause-btn'),
+                fullscreenBtn: document.getElementById('fullscreen-btn'),
+                hideUiBtn: document.getElementById('hide-ui-btn'),
+
+                toggleTelemetryBtn: document.getElementById('toggle-telemetry-btn'),
+                telemetryBody: document.getElementById('telemetry-body'),
+                toggleControlsBtn: document.getElementById('toggle-controls-btn'),
+                controlsBody: document.getElementById('controls-body'),
+
+                modeSwarmBtn: document.getElementById('mode-swarm-btn'),
+                modeShellBtn: document.getElementById('mode-shell-btn'),
+                ctrlModeTag: document.getElementById('ctrl-mode-tag'),
+
+                densitySlider: document.getElementById('density-slider'),
+                densityReadout: document.getElementById('density-readout'),
+                radiusSlider: document.getElementById('radius-slider'),
+                radiusReadout: document.getElementById('radius-readout'),
+                intensitySlider: document.getElementById('intensity-slider'),
+                intensityReadout: document.getElementById('intensity-readout'),
+
+                motionToggleBtn: document.getElementById('motion-toggle-btn'),
+                orbitsToggleBtn: document.getElementById('orbits-toggle-btn'),
+
+                telConfig: document.getElementById('tel-config'),
+                telCount: document.getElementById('tel-count'),
+                telIntensity: document.getElementById('tel-intensity'),
+                telRadius: document.getElementById('tel-radius'),
+                telFraction: document.getElementById('tel-fraction'),
+                telPower: document.getElementById('tel-power'),
+                telScale: document.getElementById('tel-scale'),
+                telEnergyBar: document.getElementById('tel-energy-bar'),
+                telDisclaimer: document.getElementById('tel-disclaimer')
+            };
+
+            ui.densitySlider.max = String(appState.maxCollectors);
+            ui.densitySlider.value = String(appState.collectorCount);
+
+            function syncUIAndTelemetry() {
+                var isSwarm = appState.mode === 'swarm';
+                ui.headerModeLabel.textContent = isSwarm ? 'DYSON SWARM' : 'DYSON SHELL (SPECULATIVE)';
+                ui.ctrlModeTag.textContent = isSwarm ? 'Plausible Orbiters' : 'Speculative Enclosure';
+                ui.modeSwarmBtn.classList.toggle('active', isSwarm);
+                ui.modeShellBtn.classList.toggle('active', !isSwarm);
+
+                var formattedCount = appState.collectorCount.toLocaleString() + (isSwarm ? ' Units' : ' Shell Tiles');
+                ui.densityReadout.textContent = formattedCount;
+                ui.radiusReadout.textContent = appState.orbitalRadius.toFixed(2) + ' AU';
+                ui.intensityReadout.textContent = appState.starIntensity.toFixed(2) + ' L☉';
+
+                ui.autoRotateBtn.classList.toggle('active', appState.autoRotate);
+                ui.pauseBtn.classList.toggle('amber-active', appState.paused);
+                ui.pauseBtn.textContent = appState.paused ? 'RESUME' : 'PAUSE';
+
+                ui.motionToggleBtn.classList.toggle('active', appState.collectorMotion);
+                ui.orbitsToggleBtn.classList.toggle('active', appState.showOrbitalPaths);
+
+                var metrics = computeTelemetry(appState);
+                ui.telConfig.textContent = isSwarm ? 'Dyson Swarm' : 'Dyson Shell (Speculative)';
+                ui.telCount.textContent = formattedCount;
+                ui.telIntensity.textContent = appState.starIntensity.toFixed(2) + ' L☉';
+                ui.telRadius.textContent = appState.orbitalRadius.toFixed(2) + ' AU';
+
+                var pct = (metrics.capturedFraction * 100).toFixed(2) + '%';
+                ui.telFraction.textContent = pct;
+                ui.telEnergyBar.style.width = Math.min(100, Math.max(2, metrics.capturedFraction * 100)).toFixed(1) + '%';
+                ui.telPower.textContent = formatScientificWatts(metrics.capturedWatts);
+                ui.telScale.textContent = 'Type ' + metrics.kardashevIndex.toFixed(2) + ' (Kardashev)';
+
+                if (isSwarm) {
+                    ui.telDisclaimer.innerHTML =
+                        '<strong>Simplified Theoretical Estimate:</strong> Approximates intercepted power across an idealized sphere of radius <em>r</em>. Real collector swarms experience cosine orientation losses, orbital spacing, and mutual shadowing.' +
+                        '<span class="formula-tag">f = min(1, A_eff / (4 &times; &pi; &times; r&sup2;)) &bull; P = L&#9737; &times; f</span>';
+                } else {
+                    ui.telDisclaimer.innerHTML =
+                        '<strong>Speculative Science-Fiction Concept:</strong> A rigid continuous Dyson Shell is not a feasible engineering design due to immense compressive stresses and lack of gravitational stability around the star. Energy values represent an idealized visualization.' +
+                        '<span class="formula-tag">f = min(1, A_eff / (4 &times; &pi; &times; r&sup2;)) &bull; P = L&#9737; &times; f</span>';
+                }
+            }
+
+            ui.exploreBtn.addEventListener('click', function () {
+                ui.introOverlay.classList.add('dismissed');
+                requestSceneRender(false);
+            });
+
+            ui.modeSwarmBtn.addEventListener('click', function () {
+                if (appState.mode !== 'swarm') {
+                    appState.mode = 'swarm';
+                    syncUIAndTelemetry();
+                    requestSceneRender(true);
+                }
+            });
+
+            ui.modeShellBtn.addEventListener('click', function () {
+                if (appState.mode !== 'shell') {
+                    appState.mode = 'shell';
+                    syncUIAndTelemetry();
+                    requestSceneRender(true);
+                }
+            });
+
+            ui.densitySlider.addEventListener('input', function (e) {
+                appState.collectorCount = parseInt(e.target.value, 10);
+                syncUIAndTelemetry();
+                requestSceneRender(true);
+            });
+
+            ui.radiusSlider.addEventListener('input', function (e) {
+                appState.orbitalRadius = parseFloat(e.target.value);
+                syncUIAndTelemetry();
+                requestSceneRender(true);
+            });
+
+            ui.intensitySlider.addEventListener('input', function (e) {
+                appState.starIntensity = parseFloat(e.target.value);
+                syncUIAndTelemetry();
+                requestSceneRender(false);
+            });
+
+            ui.motionToggleBtn.addEventListener('click', function () {
+                appState.collectorMotion = !appState.collectorMotion;
+                syncUIAndTelemetry();
+                requestSceneRender(false);
+            });
+
+            ui.orbitsToggleBtn.addEventListener('click', function () {
+                appState.showOrbitalPaths = !appState.showOrbitalPaths;
+                syncUIAndTelemetry();
+                requestSceneRender(false);
+            });
+
+            ui.zoomInBtn.addEventListener('click', function () {
+                cameraCtrl.zoomStep(0.84);
+            });
+
+            ui.zoomOutBtn.addEventListener('click', function () {
+                cameraCtrl.zoomStep(1.18);
+            });
+
+            ui.resetViewBtn.addEventListener('click', function () {
+                cameraCtrl.reset();
+            });
+
+            ui.autoRotateBtn.addEventListener('click', function () {
+                appState.autoRotate = !appState.autoRotate;
+                syncUIAndTelemetry();
+                requestSceneRender(false);
+            });
+
+            ui.pauseBtn.addEventListener('click', function () {
+                appState.paused = !appState.paused;
+                syncUIAndTelemetry();
+                requestSceneRender(false);
+            });
+
+            function setUIHidden(hidden) {
+                appState.uiHidden = hidden;
+                ui.hudLayer.classList.toggle('ui-hidden', hidden);
+                ui.restoreUiBtn.classList.toggle('visible', hidden);
+            }
+
+            ui.hideUiBtn.addEventListener('click', function () {
+                setUIHidden(true);
+            });
+
+            ui.restoreUiBtn.addEventListener('click', function () {
+                setUIHidden(false);
+            });
+
+            window.addEventListener('keydown', function (e) {
+                if (e.key === 'h' || e.key === 'H') {
+                    setUIHidden(!appState.uiHidden);
+                } else if (e.key === 'Escape' && appState.uiHidden) {
+                    setUIHidden(false);
+                }
+            });
+
+            ui.fullscreenBtn.addEventListener('click', function () {
+                var docEl = document.documentElement;
+                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                    var req = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+                    if (req) {
+                        try {
+                            var promise = req.call(docEl);
+                            if (promise && promise.catch) {
+                                promise.catch(function () { });
+                            }
+                        } catch (_) { }
+                    }
+                } else {
+                    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+                    if (exit) {
+                        try { exit.call(document); } catch (_) { }
+                    }
+                }
+            });
+
+            ui.toggleTelemetryBtn.addEventListener('click', function () {
+                var collapsed = ui.telemetryBody.classList.toggle('collapsed');
+                ui.toggleTelemetryBtn.textContent = collapsed ? 'EXPAND' : 'MINIMIZE';
+            });
+
+            ui.toggleControlsBtn.addEventListener('click', function () {
+                var collapsed = ui.controlsBody.classList.toggle('collapsed');
+                ui.toggleControlsBtn.textContent = collapsed ? 'EXPAND' : 'MINIMIZE';
+            });
+
+            // Responsive Resize & Orientation Handling (Adjusts slider max safely without rebuilding scene)
+            window.addEventListener('resize', function () {
+                if (activeRenderer && activeRenderer.resize) {
+                    activeRenderer.resize(window.innerWidth, window.innerHeight);
+                }
+                appState.maxCollectors = profile.maxCollectors;
+                ui.densitySlider.max = String(appState.maxCollectors);
+                if (appState.collectorCount > appState.maxCollectors) {
+                    appState.collectorCount = appState.maxCollectors;
+                    ui.densitySlider.value = String(appState.collectorCount);
+                    syncUIAndTelemetry();
+                }
+                requestSceneRender(true);
+            });
+
+            // True loop suspension when tab is hidden
+            document.addEventListener('visibilitychange', function () {
+                appState.tabHidden = document.hidden;
+                if (document.hidden) {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                } else {
+                    lastFrameTime = performance.now();
+                    requestSceneRender(false);
+                }
+            });
+
+            syncUIAndTelemetry();
+
+            /* --------------------------------------------------------------------------
+             * DEMAND-DRIVEN REQUESTANIMATIONFRAME LOOP
+             * -------------------------------------------------------------------------- */
+            function animate(now) {
+                rafId = null;
+
+                if (appState.tabHidden) {
+                    return;
+                }
+
+                var dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000.0));
+                lastFrameTime = now;
+
+                var effectiveAutoRotate = appState.autoRotate && !appState.paused;
+                var cameraStillMoving = cameraCtrl.update(dt, effectiveAutoRotate);
+                var sceneAnimating = !appState.paused;
+
+                if (sceneAnimating || cameraStillMoving || appState.needsRender) {
+                    var camPos = cameraCtrl.getCartesianPosition();
+                    var isMorphing = activeRenderer.updateAndRender(dt, camPos);
+                    appState.needsRender = Boolean(isMorphing);
+                }
+
+                // Only schedule the next frame if animation, camera damping, or morphing is active
+                if (!appState.tabHidden && (sceneAnimating || cameraStillMoving || appState.needsRender)) {
+                    rafId = requestAnimationFrame(animate);
+                }
+            }
+
+            scheduleLoop();
+        })();
+    </script>
+</body>
+
+</html>
