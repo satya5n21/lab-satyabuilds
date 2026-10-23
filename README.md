@@ -4,6 +4,7 @@ A small monorepo for independent web experiments.
 
 ## Apps
 
+- `site`: React, TypeScript, and Vite lab homepage.
 - `cosmo-music-visualizer`: React, TypeScript, and Vite.
 - `dyson-sphere`: standalone HTML, CSS, and JavaScript.
 
@@ -18,6 +19,10 @@ npm run dev:dyson-sphere
 ```
 
 Each command starts its own development server. Vite prints the URL to open.
+These app-specific servers are isolated, so the homepage dev server cannot
+serve the other apps' paths. To test navigation between all three apps on one
+origin, use `npm run preview`; it builds the combined site and serves it through
+Wrangler.
 
 ## Build and deploy to Cloudflare Workers Static Assets
 
