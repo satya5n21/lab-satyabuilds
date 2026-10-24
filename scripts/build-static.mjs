@@ -18,6 +18,8 @@ const sources = [
   join(repoRoot, 'site', 'dist'),
   join(repoRoot, 'apps', 'dyson-sphere', 'site'),
   join(repoRoot, 'apps', 'cosmo-music-visualizer', 'dist'),
+  join(repoRoot, 'apps', 'palagic', 'site'),
+  join(repoRoot, 'apps', 'production-panic', 'dist'),
 ];
 
 // Check every input before clearing the previous deployment output.
@@ -34,5 +36,7 @@ await mkdir(outputDir, { recursive: true });
 await copyDirectoryContents(sources[0], outputDir);
 await copyDirectoryContents(sources[1], join(outputDir, 'dyson-sphere'));
 await copyDirectoryContents(sources[2], join(outputDir, 'cosmo-music-visualizer'));
+await copyDirectoryContents(sources[3], join(outputDir, 'pelagic'));
+await copyDirectoryContents(sources[4], join(outputDir, 'production-panic'));
 
 console.log(`Cloudflare static site assembled at ${outputDir}`);

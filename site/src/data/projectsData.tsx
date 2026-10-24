@@ -1,5 +1,10 @@
 import { ProjectItem } from '../types/project';
-import { DysonIcon, CosmoIcon } from '../components/Icons';
+import {
+    CosmoIcon,
+    DysonIcon,
+    PelagicIcon,
+    ProductionPanicIcon,
+} from '../components/Icons';
 
 export const projectsData: ProjectItem[] = [
     {
@@ -23,5 +28,27 @@ export const projectsData: ProjectItem[] = [
         ctaText: 'Launch',
         glowColor: '#9b80ff',
         icon: <CosmoIcon />,
+    },
+    {
+        id: 'pelagic',
+        href: '/pelagic/',
+        category: 'Ocean atmosphere',
+        title: 'Pelagic',
+        description: 'Drift into a calm ocean simulation shaped by light, water, and gentle motion.',
+        tag: 'Calm simulation',
+        ctaText: 'Explore',
+        glowColor: '#56c2d6',
+        icon: <PelagicIcon />,
+    },
+    {
+        id: 'production-panic',
+        href: '/production-panic/',
+        category: 'Incident response',
+        title: 'Production Panic',
+        description: 'Stabilize a production incident by reading system signals and choosing your response.',
+        tag: 'SRE simulation',
+        ctaText: 'Respond',
+        glowColor: '#ff826d',
+        icon: <ProductionPanicIcon />,
     },
 ];

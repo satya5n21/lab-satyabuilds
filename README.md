@@ -7,6 +7,8 @@ A small monorepo for independent web experiments.
 - `site`: React, TypeScript, and Vite lab homepage.
 - `cosmo-music-visualizer`: React, TypeScript, and Vite.
 - `dyson-sphere`: standalone HTML, CSS, and JavaScript.
+- `palagic`: standalone Pelagic calm ocean simulator.
+- `production-panic`: React, TypeScript, and Vite.
 
 ## Run locally
 
@@ -16,6 +18,8 @@ Run these from the repository root after `npm install`:
 npm run dev:site
 npm run dev:cosmo-music-visualizer
 npm run dev:dyson-sphere
+npm run dev:palagic
+npm run dev:production-panic
 ```
 
 Each command starts its own development server. Vite prints the URL to open.
@@ -34,7 +38,8 @@ npm run deploy
 
 The combined site is assembled in `deployment/public`. The homepage is at `/`,
 the Dyson Sphere app is at `/dyson-sphere/`, and the music visualizer is at
-`/cosmo-music-visualizer/`. `wrangler.jsonc` points Cloudflare Wrangler at that
+`/cosmo-music-visualizer/`. Pelagic is at `/pelagic/`, and Production Panic is
+at `/production-panic/`. `wrangler.jsonc` points Cloudflare Wrangler at that
 assembled directory.
 
 For Cloudflare Workers Builds, set the project root to the repository root,

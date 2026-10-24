@@ -3,15 +3,19 @@
     "private": true,
     "workspaces": [
         "apps/cosmo-music-visualizer",
+        "apps/production-panic",
         "site"
     ],
     "scripts": {
         "dev:site": "npm run dev --workspace=@satyabuilds/site",
         "dev:cosmo-music-visualizer": "npm run dev --workspace=cosmos-music-visualizer-argon",
         "dev:dyson-sphere": "vite apps/dyson-sphere/site --host 127.0.0.1 --port 5174",
+        "dev:palagic": "vite apps/palagic/site --host 127.0.0.1 --port 5177",
+        "dev:production-panic": "npm run dev --workspace=production-panic",
         "build:site": "npm run build --workspace=@satyabuilds/site",
         "build:cosmo-music-visualizer": "npm run build --workspace=cosmos-music-visualizer-argon",
-        "build:static": "npm run build:site && npm run build:cosmo-music-visualizer && node scripts/build-static.mjs",
+        "build:production-panic": "npm run build --workspace=production-panic",
+        "build:static": "npm run build:site && npm run build:cosmo-music-visualizer && npm run build:production-panic && node scripts/build-static.mjs",
         "build": "npm run build:static",
         "preview": "npm run build:static && wrangler dev",
         "deploy": "npm run build:static && wrangler deploy"
