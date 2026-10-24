@@ -7,7 +7,7 @@ A small monorepo for independent web experiments.
 - `site`: React, TypeScript, and Vite lab homepage.
 - `cosmo-music-visualizer`: React, TypeScript, and Vite.
 - `dyson-sphere`: standalone HTML, CSS, and JavaScript.
-- `palagic`: standalone Pelagic calm ocean simulator.
+- `pelagic`: standalone Pelagic calm ocean simulator.
 - `production-panic`: React, TypeScript, and Vite.
 
 ## Run locally
@@ -18,7 +18,7 @@ Run these from the repository root after `npm install`:
 npm run dev:site
 npm run dev:cosmo-music-visualizer
 npm run dev:dyson-sphere
-npm run dev:palagic
+npm run dev:pelagic
 npm run dev:production-panic
 ```
 

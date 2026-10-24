@@ -18,7 +18,7 @@ const sources = [
   join(repoRoot, 'site', 'dist'),
   join(repoRoot, 'apps', 'dyson-sphere', 'site'),
   join(repoRoot, 'apps', 'cosmo-music-visualizer', 'dist'),
-  join(repoRoot, 'apps', 'palagic', 'site'),
+  join(repoRoot, 'apps', 'pelagic', 'site'),
   join(repoRoot, 'apps', 'production-panic', 'dist'),
 ];
 
