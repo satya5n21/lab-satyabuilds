@@ -13,6 +13,8 @@ export type QualityLevel = 'high' | 'low';
 
 export interface GameSettings {
     muted: boolean;
+    musicMuted: boolean;
+    musicVolume: number;
     sensitivity: number;
     quality: QualityLevel;
     reducedMotion: boolean;

@@ -9,15 +9,19 @@ export function App() {
     const gameRef = useRef<GameInstance | null>(null);
 
     const [phase, setPhase] = useState<GamePhase>('start');
+    const [isPointerLocked, setIsPointerLocked] = useState<boolean>(false);
     const [currentQuote, setCurrentQuote] = useState<string>('');
     const [quoteVisible, setQuoteVisible] = useState<boolean>(false);
     const [showReimagine, setShowReimagine] = useState<boolean>(false);
     const [showControlHint, setShowControlHint] = useState<boolean>(true);
+    const [musicBlocked, setMusicBlocked] = useState<boolean>(false);
     const [webglError, setWebglError] = useState<string | null>(null);
     const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
 
     const [settings, setSettings] = useState<GameSettings>({
         muted: false,
+        musicMuted: false,
+        musicVolume: 0.60,
         sensitivity: 1.0,
         quality: 'high',
         reducedMotion: false
@@ -51,7 +55,12 @@ export function App() {
             onPlayerWalkedDistance: () => {
                 setShowControlHint(false);
             },
-            onPointerLockChange: () => { },
+            onPointerLockChange: (locked) => {
+                setIsPointerLocked(locked);
+            },
+            onMusicBlockedChange: (blocked) => {
+                setMusicBlocked(blocked);
+            },
             onWebGLError: (msg) => {
                 setWebglError(msg);
             }
@@ -69,10 +78,6 @@ export function App() {
         gameRef.current?.updateSettings(settings);
     }, [settings]);
 
-    // Sequenced monolith reflection reveal:
-    // 1) World settles & engravings surge immediately at t = 0
-    // 2) Quote fades in smoothly at t = 550ms
-    // 3) REIMAGINE action fades in at t = 3200ms
     useEffect(() => {
         if (phase !== 'reflection') {
             setQuoteVisible(false);
@@ -94,7 +99,6 @@ export function App() {
         };
     }, [phase]);
 
-    // Fade opening control hints after 6.5 seconds if not already dismissed by walking
     useEffect(() => {
         if (phase !== 'exploring' || !showControlHint) return;
         const timer = window.setTimeout(() => {
@@ -103,31 +107,63 @@ export function App() {
         return () => window.clearTimeout(timer);
     }, [phase, showControlHint]);
 
-    const handleStartJourney = () => {
+    const stopUIEventPropagation = (e: React.SyntheticEvent) => {
+        e.stopPropagation();
+    };
+
+    const handleStartJourney = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
         setShowControlHint(true);
         gameRef.current?.startJourney();
     };
 
-    const handleTouchMonolith = () => {
+    const handleTouchMonolith = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
         gameRef.current?.activateMonolith();
     };
 
-    const handleReimagine = () => {
+    const handleReimagine = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
         setShowReimagine(false);
         setQuoteVisible(false);
         gameRef.current?.resetGame();
     };
 
-    const toggleMute = () => {
+    const toggleMute = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
         setSettings((prev) => ({ ...prev, muted: !prev.muted }));
     };
 
-    const toggleReducedMotion = () => {
+    const toggleMusicMute = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        setSettings((prev) => ({ ...prev, musicMuted: !prev.musicMuted }));
+    };
+
+    const toggleReducedMotion = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
         setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }));
     };
 
-    const handleQualityChange = (q: QualityLevel) => {
+    const handleQualityChange = (
+        e: React.MouseEvent<HTMLButtonElement>,
+        q: QualityLevel
+    ) => {
+        e.stopPropagation();
         setSettings((prev) => ({ ...prev, quality: q }));
+    };
+
+    const handlePauseOrResumeToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        if (phase === 'paused') {
+            gameRef.current?.resumeGame();
+        } else {
+            gameRef.current?.pauseGame();
+        }
+    };
+
+    const handleResumeJourney = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        gameRef.current?.resumeGame();
     };
 
     const onJoystickPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -205,14 +241,24 @@ export function App() {
             />
 
             {webglError && (
-                <div className="overlay-screen">
+                <div
+                    className="overlay-screen"
+                    data-ui-control="true"
+                    onMouseDown={stopUIEventPropagation}
+                    onClick={stopUIEventPropagation}
+                >
                     <h1 className="title-heading">THE STARS REMAIN</h1>
                     <p className="title-subtitle">{webglError}</p>
                 </div>
             )}
 
             {!webglError && phase === 'start' && (
-                <div className="overlay-screen">
+                <div
+                    className="overlay-screen"
+                    data-ui-control="true"
+                    onMouseDown={stopUIEventPropagation}
+                    onClick={stopUIEventPropagation}
+                >
                     <h1 className="title-heading">THE STARS REMAIN</h1>
                     <p className="title-subtitle">
                         A quiet journey beneath an endless sky.
@@ -220,6 +266,7 @@ export function App() {
                     <button
                         type="button"
                         className="primary-action-btn"
+                        data-ui-control="true"
                         onClick={handleStartJourney}
                     >
                         BEGIN JOURNEY
@@ -229,10 +276,31 @@ export function App() {
 
             {!webglError && phase !== 'start' && (
                 <>
-                    <div className="hud-top-bar">
+                    <div
+                        className="hud-top-bar"
+                        data-ui-control="true"
+                        onMouseDown={stopUIEventPropagation}
+                        onClick={stopUIEventPropagation}
+                    >
+                        {musicBlocked && !settings.muted && !settings.musicMuted && (
+                            <button
+                                type="button"
+                                className="primary-action-btn"
+                                data-ui-control="true"
+                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem' }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    gameRef.current?.retryMusicPlayback();
+                                }}
+                                title="Enable background music"
+                            >
+                                ENABLE MUSIC
+                            </button>
+                        )}
                         <button
                             type="button"
                             className="icon-btn"
+                            data-ui-control="true"
                             onClick={toggleMute}
                             aria-label={settings.muted ? 'Unmute audio' : 'Mute audio'}
                             title={settings.muted ? 'Unmute audio' : 'Mute audio'}
@@ -243,11 +311,8 @@ export function App() {
                             <button
                                 type="button"
                                 className="icon-btn"
-                                onClick={() =>
-                                    phase === 'paused'
-                                        ? gameRef.current?.resumeGame()
-                                        : gameRef.current?.pauseGame()
-                                }
+                                data-ui-control="true"
+                                onClick={handlePauseOrResumeToggle}
                                 aria-label={phase === 'paused' ? 'Resume game' : 'Pause and settings'}
                                 title={phase === 'paused' ? 'Resume game' : 'Pause and settings'}
                             >
@@ -263,14 +328,20 @@ export function App() {
                         />
                     )}
 
-                    <div className="hud-bottom-prompts">
+                    <div
+                        className="hud-bottom-prompts"
+                        style={{ pointerEvents: 'none' }}
+                    >
                         {phase === 'nearMonolith' && (
                             <button
                                 type="button"
                                 className="touch-monolith-btn"
+                                data-ui-control="true"
+                                style={{ pointerEvents: 'auto' }}
+                                onMouseDown={stopUIEventPropagation}
                                 onClick={handleTouchMonolith}
                             >
-                                {isTouchDevice ? 'TAP - TOUCH THE MONOLITH' : 'E - TOUCH THE MONOLITH'}
+                                {isTouchDevice ? 'TAP — TOUCH THE MONOLITH' : 'E — TOUCH THE MONOLITH'}
                             </button>
                         )}
 
@@ -278,7 +349,11 @@ export function App() {
                             <div className="subtle-hint">Something ancient waits ahead.</div>
                         )}
 
-                        {phase === 'exploring' && showControlHint && (
+                        {isPlaying && !isTouchDevice && !isPointerLocked && (
+                            <div className="subtle-hint">Click to resume look</div>
+                        )}
+
+                        {phase === 'exploring' && showControlHint && (isTouchDevice || isPointerLocked) && (
                             <div className="control-hint-pills">
                                 {isTouchDevice ? (
                                     <>
@@ -299,6 +374,7 @@ export function App() {
                         <div className="mobile-controls-layer">
                             <div
                                 className="virtual-joystick-zone"
+                                data-ui-control="true"
                                 onPointerDown={onJoystickPointerDown}
                                 onPointerMove={onJoystickPointerMove}
                                 onPointerUp={onJoystickPointerUp}
@@ -314,6 +390,7 @@ export function App() {
 
                             <div
                                 className="touch-look-zone"
+                                data-ui-control="true"
                                 onPointerDown={onLookPointerDown}
                                 onPointerMove={onLookPointerMove}
                                 onPointerUp={onLookPointerUp}
@@ -325,8 +402,13 @@ export function App() {
             )}
 
             {!webglError && phase === 'reflection' && (
-                <div className="overlay-screen quote-overlay">
-                    <div className="quote-card">
+                <div
+                    className="overlay-screen quote-overlay"
+                    data-ui-control="true"
+                    onMouseDown={stopUIEventPropagation}
+                    onClick={stopUIEventPropagation}
+                >
+                    <div className="quote-card" data-ui-control="true">
                         {quoteVisible && (
                             <>
                                 <div className="quote-header">THE STARS REMAIN</div>
@@ -338,6 +420,7 @@ export function App() {
                                 <button
                                     type="button"
                                     className="primary-action-btn"
+                                    data-ui-control="true"
                                     onClick={handleReimagine}
                                 >
                                     REIMAGINE
@@ -349,8 +432,13 @@ export function App() {
             )}
 
             {!webglError && phase === 'paused' && (
-                <div className="overlay-screen">
-                    <div className="settings-panel">
+                <div
+                    className="overlay-screen"
+                    data-ui-control="true"
+                    onMouseDown={stopUIEventPropagation}
+                    onClick={stopUIEventPropagation}
+                >
+                    <div className="settings-panel" data-ui-control="true">
                         <h2
                             className="title-heading"
                             style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}
@@ -364,6 +452,7 @@ export function App() {
                                 <button
                                     type="button"
                                     className="primary-action-btn"
+                                    data-ui-control="true"
                                     style={{ padding: '0.45rem 1rem', fontSize: '0.75rem' }}
                                     onClick={toggleMute}
                                 >
@@ -374,10 +463,47 @@ export function App() {
 
                         <div className="settings-row">
                             <div className="settings-inline">
+                                <span>Background Music</span>
+                                <button
+                                    type="button"
+                                    className="primary-action-btn"
+                                    data-ui-control="true"
+                                    style={{ padding: '0.45rem 1rem', fontSize: '0.75rem' }}
+                                    onClick={toggleMusicMute}
+                                >
+                                    {settings.musicMuted ? 'MUTED' : 'ACTIVE'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-inline">
+                                <span>Music Volume</span>
+                                <span>{Math.round(settings.musicVolume * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                data-ui-control="true"
+                                value={settings.musicVolume}
+                                onChange={(e) =>
+                                    setSettings((prev) => ({
+                                        ...prev,
+                                        musicVolume: parseFloat(e.target.value)
+                                    }))
+                                }
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-inline">
                                 <span>Reduced Camera Motion</span>
                                 <button
                                     type="button"
                                     className="primary-action-btn"
+                                    data-ui-control="true"
                                     style={{ padding: '0.45rem 1rem', fontSize: '0.75rem' }}
                                     onClick={toggleReducedMotion}
                                 >
@@ -396,6 +522,7 @@ export function App() {
                                 min="0.3"
                                 max="2.2"
                                 step="0.1"
+                                data-ui-control="true"
                                 value={settings.sensitivity}
                                 onChange={(e) =>
                                     setSettings((prev) => ({
@@ -415,12 +542,13 @@ export function App() {
                                             key={q}
                                             type="button"
                                             className="primary-action-btn"
+                                            data-ui-control="true"
                                             style={{
                                                 padding: '0.4rem 0.85rem',
                                                 fontSize: '0.72rem',
                                                 opacity: settings.quality === q ? 1 : 0.5
                                             }}
-                                            onClick={() => handleQualityChange(q)}
+                                            onClick={(e) => handleQualityChange(e, q)}
                                         >
                                             {q.toUpperCase()}
                                         </button>
@@ -440,8 +568,9 @@ export function App() {
                             <button
                                 type="button"
                                 className="primary-action-btn"
+                                data-ui-control="true"
                                 style={{ width: '100%' }}
-                                onClick={() => gameRef.current?.resumeGame()}
+                                onClick={handleResumeJourney}
                             >
                                 RESUME JOURNEY
                             </button>

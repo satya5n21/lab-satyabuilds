@@ -1,4 +1,7 @@
-import { WORLD_CONFIG } from './gameTypes';
+import { GameSettings, WORLD_CONFIG } from './gameTypes';
+
+const REFLECTION_MUSIC_FACTOR = 0.45;
+const FADE_DURATION_SECONDS = 1.5;
 
 export class AmbientAudioEngine {
     private ctx: AudioContext | null = null;
@@ -7,12 +10,133 @@ export class AmbientAudioEngine {
     private droneGain: GainNode | null = null;
     private proximityResonanceGain: GainNode | null = null;
     private noiseBuffer: AudioBuffer | null = null;
+
+    // Background soundtrack HTMLAudioElement state
+    private musicEl: HTMLAudioElement | null = null;
+    private musicVolume = 0.60;
+    private musicMuted = false;
+    private currentMusicFade = 1.0;
+    private targetMusicFade = 1.0;
+    private musicJourneyStarted = false;
+    private musicLoadFailed = false;
+    private musicPlaybackBlocked = false;
+    private wasMusicPlayingBeforeHide = false;
+
     private isMuted = false;
     private isInitialized = false;
     private inReflection = false;
 
-    public initFromUserGesture(muted: boolean): void {
-        this.isMuted = muted;
+    constructor(
+        initialSettings?: Pick<GameSettings, 'muted' | 'musicMuted' | 'musicVolume'>,
+        private readonly onMusicBlockedChange?: (blocked: boolean) => void
+    ) {
+        if (initialSettings) {
+            this.isMuted = initialSettings.muted;
+            this.musicMuted = initialSettings.musicMuted;
+            this.musicVolume = Math.max(0, Math.min(1, initialSettings.musicVolume));
+        }
+        this.setupMusicElement();
+    }
+
+    private setupMusicElement(): void {
+        try {
+            const audio = new Audio(`${import.meta.env.BASE_URL}assets/theme_song.mp3`);
+            audio.loop = true;
+            audio.preload = 'auto';
+            audio.volume = this.computeEffectiveMusicVolume();
+
+            audio.addEventListener('error', this.handleMusicError);
+            audio.addEventListener('playing', this.handleMusicPlaying);
+            this.musicEl = audio;
+        } catch (err) {
+            this.musicLoadFailed = true;
+            console.warn('[The Stars Remain] Failed to initialize HTMLAudioElement:', err);
+        }
+    }
+
+    private handleMusicError = (): void => {
+        this.musicLoadFailed = true;
+        this.setMusicBlocked(false);
+        console.warn(
+            '[The Stars Remain] Background soundtrack could not be loaded from public/assets/theme_song.mp3. Continuing with procedural ambience only.'
+        );
+    };
+
+    private handleMusicPlaying = (): void => {
+        this.setMusicBlocked(false);
+    };
+
+    private setMusicBlocked(blocked: boolean): void {
+        if (this.musicPlaybackBlocked === blocked) return;
+        this.musicPlaybackBlocked = blocked;
+        this.onMusicBlockedChange?.(blocked);
+    }
+
+    private computeEffectiveMusicVolume(): number {
+        if (this.isMuted || this.musicMuted) {
+            return 0;
+        }
+        const clampedUserVol = Math.max(0, Math.min(1, this.musicVolume));
+        const clampedFade = Math.max(0, Math.min(1, this.currentMusicFade));
+        // Never exceeds the user's selected musicVolume
+        return Math.max(0, Math.min(clampedUserVol, clampedUserVol * clampedFade));
+    }
+
+    private applyMusicVolume(): void {
+        if (!this.musicEl || this.musicLoadFailed) return;
+        this.musicEl.volume = this.computeEffectiveMusicVolume();
+    }
+
+    /**
+     * Starts the background soundtrack on BEGIN JOURNEY or retries playback if blocked.
+     * Does not reset currentTime if already playing or paused mid-session.
+     */
+    public startOrResumeMusic(): void {
+        this.musicJourneyStarted = true;
+        if (!this.musicEl || this.musicLoadFailed) return;
+
+        this.applyMusicVolume();
+
+        if (!this.musicEl.paused) {
+            this.setMusicBlocked(false);
+            return;
+        }
+
+        try {
+            const playPromise = this.musicEl.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        this.setMusicBlocked(false);
+                    })
+                    .catch((err: unknown) => {
+                        if (this.musicLoadFailed) return;
+                        const errName = err instanceof DOMException ? err.name : '';
+                        if (errName === 'NotAllowedError') {
+                            console.info(
+                                '[The Stars Remain] Soundtrack playback blocked by browser autoplay policy; awaiting user gesture.'
+                            );
+                            this.setMusicBlocked(true);
+                        } else if (errName !== 'AbortError') {
+                            console.warn('[The Stars Remain] Soundtrack playback error:', err);
+                        }
+                    });
+            }
+        } catch (err) {
+            console.warn('[The Stars Remain] Could not start soundtrack:', err);
+        }
+    }
+
+    public initFromUserGesture(
+        settings: Pick<GameSettings, 'muted' | 'musicMuted' | 'musicVolume'>
+    ): void {
+        this.isMuted = settings.muted;
+        this.musicMuted = settings.musicMuted;
+        this.musicVolume = Math.max(0, Math.min(1, settings.musicVolume));
+
+        // Start or continue the MP3 soundtrack without resetting playback position
+        this.startOrResumeMusic();
+
         if (this.isInitialized) {
             this.resumeIfNeeded();
             return;
@@ -28,7 +152,7 @@ export class AmbientAudioEngine {
             this.ctx = ctx;
 
             const masterGain = ctx.createGain();
-            masterGain.gain.value = muted ? 0 : 0.92;
+            masterGain.gain.value = this.isMuted ? 0 : 0.92;
             masterGain.connect(ctx.destination);
             this.masterGain = masterGain;
 
@@ -80,11 +204,11 @@ export class AmbientAudioEngine {
 
             const osc1 = ctx.createOscillator();
             osc1.type = 'sine';
-            osc1.frequency.value = 65.41; // C2
+            osc1.frequency.value = 65.41;
 
             const osc2 = ctx.createOscillator();
             osc2.type = 'triangle';
-            osc2.frequency.value = 98.0; // G2
+            osc2.frequency.value = 98.0;
 
             osc1.connect(droneFilter);
             osc2.connect(droneFilter);
@@ -94,7 +218,7 @@ export class AmbientAudioEngine {
             osc1.start();
             osc2.start();
 
-            // 3. Continuous, Distance-Modulated Monolith Proximity Resonance (55Hz / 110Hz sub-harmonic)
+            // 3. Continuous, Distance-Modulated Monolith Proximity Resonance
             const proxGain = ctx.createGain();
             proxGain.gain.value = 0.0001;
             this.proximityResonanceGain = proxGain;
@@ -105,11 +229,11 @@ export class AmbientAudioEngine {
 
             const proxOsc1 = ctx.createOscillator();
             proxOsc1.type = 'sine';
-            proxOsc1.frequency.value = 55.0; // A1
+            proxOsc1.frequency.value = 55.0;
 
             const proxOsc2 = ctx.createOscillator();
             proxOsc2.type = 'sine';
-            proxOsc2.frequency.value = 110.0; // A2
+            proxOsc2.frequency.value = 110.0;
 
             proxOsc1.connect(proxFilter);
             proxOsc2.connect(proxFilter);
@@ -129,18 +253,67 @@ export class AmbientAudioEngine {
         if (this.ctx && this.ctx.state === 'suspended') {
             this.ctx.resume().catch(() => { });
         }
+        if (this.musicJourneyStarted && this.musicPlaybackBlocked) {
+            this.startOrResumeMusic();
+        }
     }
 
-    public setMuted(muted: boolean): void {
-        this.isMuted = muted;
-        if (!this.ctx || !this.masterGain) return;
-        const now = this.ctx.currentTime;
-        this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.92, now, 0.08);
+    public updateSettings(
+        settings: Pick<GameSettings, 'muted' | 'musicMuted' | 'musicVolume'>
+    ): void {
+        this.isMuted = settings.muted;
+        this.musicMuted = settings.musicMuted;
+        this.musicVolume = Math.max(0, Math.min(1, settings.musicVolume));
+
+        if (this.ctx && this.masterGain) {
+            const now = this.ctx.currentTime;
+            this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.92, now, 0.08);
+        }
+
+        this.applyMusicVolume();
     }
 
     /**
-     * Smoothly adjusts wind quietness and low monolith resonance as the player approaches.
+     * Frame-rate-independent music fade interpolation called from the single game loop.
+     * Ensures only one transition controls music volume at a time without extra timers.
      */
+    public update(dt: number): void {
+        if (!this.musicEl || this.musicLoadFailed) return;
+
+        const diff = this.targetMusicFade - this.currentMusicFade;
+        if (Math.abs(diff) > 0.0005) {
+            const safeDt = Math.min(Math.max(dt, 0.0001), 0.1);
+            const maxStep = ((1.0 - REFLECTION_MUSIC_FACTOR) / FADE_DURATION_SECONDS) * safeDt;
+            if (Math.abs(diff) <= maxStep) {
+                this.currentMusicFade = this.targetMusicFade;
+            } else {
+                this.currentMusicFade += Math.sign(diff) * maxStep;
+            }
+            this.applyMusicVolume();
+        }
+    }
+
+    public handleVisibilityChange(hidden: boolean): void {
+        if (!this.musicEl || this.musicLoadFailed || !this.musicJourneyStarted) return;
+
+        if (hidden) {
+            this.wasMusicPlayingBeforeHide = !this.musicEl.paused;
+            if (this.wasMusicPlayingBeforeHide) {
+                this.musicEl.pause();
+            }
+            if (this.ctx && this.ctx.state === 'running') {
+                this.ctx.suspend().catch(() => { });
+            }
+        } else {
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume().catch(() => { });
+            }
+            if (this.wasMusicPlayingBeforeHide && this.musicEl.paused) {
+                this.startOrResumeMusic();
+            }
+        }
+    }
+
     public updateProximity(distanceToMonolith: number): void {
         if (!this.ctx || !this.windGain || !this.proximityResonanceGain || this.inReflection) {
             return;
@@ -154,9 +327,7 @@ export class AmbientAudioEngine {
                 Math.max(0, (distanceToMonolith - WORLD_CONFIG.INTERACTION_DISTANCE) / 32.0)
             );
 
-        // Gently quiet the wind from 0.34 down to 0.22 near the monolith
         const targetWind = 0.34 - proxFactor * 0.12;
-        // Barely audible, sacred low resonance emerging near the monolith
         const targetResonance = 0.0001 + proxFactor * proxFactor * 0.095;
 
         this.windGain.gain.setTargetAtTime(targetWind, now, 0.25);
@@ -165,16 +336,17 @@ export class AmbientAudioEngine {
 
     public setReflectionMode(isReflection: boolean): void {
         this.inReflection = isReflection;
+        // Smoothly duck music to 45% during reflection and restore to 100% on REIMAGINE
+        this.targetMusicFade = isReflection ? REFLECTION_MUSIC_FACTOR : 1.0;
+
         if (!this.ctx || !this.windGain || !this.droneGain || !this.proximityResonanceGain) return;
         const now = this.ctx.currentTime;
 
         if (isReflection) {
-            // Fade wind down smoothly over ~1 second into quiet reflection
             this.windGain.gain.setTargetAtTime(0.045, now, 0.55);
             this.droneGain.gain.setTargetAtTime(0.11, now, 0.65);
             this.proximityResonanceGain.gain.setTargetAtTime(0.035, now, 0.75);
         } else {
-            // Restore exploration ambience smoothly on REIMAGINE
             this.windGain.gain.setTargetAtTime(0.34, now, 0.7);
             this.droneGain.gain.setTargetAtTime(0.16, now, 0.7);
             this.proximityResonanceGain.gain.setTargetAtTime(0.0001, now, 0.5);
@@ -188,8 +360,6 @@ export class AmbientAudioEngine {
         this.resumeIfNeeded();
 
         const now = this.ctx.currentTime;
-
-        // Slight amplitude & timbre variation so footsteps on dry sand sound organic
         const ampJitter = 0.88 + Math.random() * 0.24;
         const duration = 0.17 + Math.random() * 0.04;
 
@@ -235,7 +405,6 @@ export class AmbientAudioEngine {
         this.resumeIfNeeded();
 
         const now = this.ctx.currentTime;
-        // Restrained, warm harmonic fifths (C3, G3, D4, A4) that swell gently and decay into silence
         const freqs = [130.81, 196.0, 293.66, 440.0];
 
         freqs.forEach((f, idx) => {
@@ -258,6 +427,13 @@ export class AmbientAudioEngine {
     }
 
     public dispose(): void {
+        if (this.musicEl) {
+            this.musicEl.pause();
+            this.musicEl.removeEventListener('error', this.handleMusicError);
+            this.musicEl.removeEventListener('playing', this.handleMusicPlaying);
+            this.musicEl.src = '';
+            this.musicEl = null;
+        }
         if (this.ctx) {
             this.ctx.close().catch(() => { });
             this.ctx = null;

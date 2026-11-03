@@ -18,6 +18,7 @@ export interface GameCallbacks {
     onQuoteSelected: (quote: string) => void;
     onPlayerWalkedDistance: (totalDistanceWalked: number) => void;
     onPointerLockChange: (locked: boolean) => void;
+    onMusicBlockedChange: (blocked: boolean) => void;
     onWebGLError: (message: string) => void;
 }
 
@@ -27,6 +28,8 @@ export interface GameInstance {
     resetGame: () => void;
     resumeGame: () => void;
     pauseGame: () => void;
+    requestPointerLock: () => void;
+    retryMusicPlayback: () => void;
     updateSettings: (settings: GameSettings) => void;
     setJoystickInput: (x: number, y: number) => void;
     rotateCameraFromTouch: (dx: number, dy: number) => void;
@@ -54,6 +57,8 @@ export function createGame(
             resetGame: () => { },
             resumeGame: () => { },
             pauseGame: () => { },
+            requestPointerLock: () => { },
+            retryMusicPlayback: () => { },
             updateSettings: () => { },
             setJoystickInput: () => { },
             rotateCameraFromTouch: () => { },
@@ -83,7 +88,6 @@ export function createGame(
         1200
     );
 
-    // Nocturnal lighting: preserves dark silhouettes while revealing selected dune ridges
     const hemiLight = new THREE.HemisphereLight(0x2a3b60, 0x060911, 0.54);
     scene.add(hemiLight);
 
@@ -91,8 +95,6 @@ export function createGame(
     moonLight.position.set(-65, 38, 42);
     scene.add(moonLight);
 
-    // Subtle near-ground night-vision fill so the sand immediately ahead of the player is navigable
-    // without brightening the distant desert or rocks
     const nearGroundLight = new THREE.PointLight(0x4b6596, 0.22, 12.5, 2.0);
     scene.add(nearGroundLight);
 
@@ -114,18 +116,32 @@ export function createGame(
     player.reducedMotion = settings.reducedMotion;
 
     const quoteBag = new QuoteBag();
-    const audio = new AmbientAudioEngine();
+    const audio = new AmbientAudioEngine(settings, callbacks.onMusicBlockedChange);
     const raycaster = new THREE.Raycaster();
 
     let phase: GamePhase = 'start';
     let isDisposed = false;
     let animFrameId = 0;
-    let isDraggingLook = false;
+
+    // Pointer-lock and fallback drag state
+    let isPointerLocked = false;
+    let pointerLockSupported =
+        typeof renderer.domElement.requestPointerLock === 'function';
+    let isDraggingFallbackLook = false;
     let dragMovedDistance = 0;
     let lastPointerX = 0;
     let lastPointerY = 0;
+
     let runDistanceWalked = 0;
     let hintDismissReported = false;
+
+    const isTouchDevice = (): boolean =>
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0 ||
+        window.matchMedia('(pointer: coarse)').matches;
+
+    const isActiveExplorationPhase = (p: GamePhase = phase): boolean =>
+        p === 'exploring' || p === 'approaching' || p === 'nearMonolith';
 
     const setPhase = (nextPhase: GamePhase) => {
         if (phase === nextPhase) return;
@@ -133,14 +149,40 @@ export function createGame(
         callbacks.onPhaseChange(nextPhase);
     };
 
-    const requestDesktopPointerLock = () => {
-        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        if (!isTouchDevice && renderer.domElement.requestPointerLock) {
-            try {
-                renderer.domElement.requestPointerLock();
-            } catch {
-                // Fallback drag look works automatically
+    /**
+     * Centralized, synchronous pointer-lock request on the Three.js gameplay canvas.
+     * Must be invoked directly inside a user gesture handler (click / pointerup).
+     */
+    const requestGamePointerLock = () => {
+        if (isDisposed || isTouchDevice()) return;
+        const canvas = renderer.domElement;
+        if (!canvas || typeof canvas.requestPointerLock !== 'function') {
+            pointerLockSupported = false;
+            return;
+        }
+
+        // Avoid duplicate requests if already locked to the gameplay canvas
+        if (document.pointerLockElement === canvas) {
+            isPointerLocked = true;
+            isDraggingFallbackLook = false;
+            callbacks.onPointerLockChange(true);
+            return;
+        }
+
+        try {
+            const maybePromise = canvas.requestPointerLock() as unknown;
+            if (
+                maybePromise &&
+                typeof (maybePromise as Promise<void>).catch === 'function'
+            ) {
+                (maybePromise as Promise<void>).catch(() => {
+                    isPointerLocked = document.pointerLockElement === canvas;
+                    callbacks.onPointerLockChange(isPointerLocked);
+                });
             }
+        } catch {
+            isPointerLocked = document.pointerLockElement === canvas;
+            callbacks.onPointerLockChange(isPointerLocked);
         }
     };
 
@@ -152,7 +194,12 @@ export function createGame(
     };
 
     const triggerMonolithEncounter = () => {
-        if (phase === 'reflection' || phase === 'resetting' || phase === 'start' || phase === 'paused') {
+        if (
+            phase === 'reflection' ||
+            phase === 'resetting' ||
+            phase === 'start' ||
+            phase === 'paused'
+        ) {
             return;
         }
         const dist = getDistanceToMonolith();
@@ -161,8 +208,16 @@ export function createGame(
         }
 
         player.clearInputs();
-        if (document.pointerLockElement === renderer.domElement && document.exitPointerLock) {
-            document.exitPointerLock();
+        isDraggingFallbackLook = false;
+        if (
+            document.pointerLockElement === renderer.domElement &&
+            document.exitPointerLock
+        ) {
+            try {
+                document.exitPointerLock();
+            } catch {
+                // Ignore exit errors
+            }
         }
 
         monolith.triggerInteractionSurge();
@@ -173,11 +228,46 @@ export function createGame(
         setPhase('reflection');
     };
 
+    const isUIControlTarget = (target: EventTarget | null): boolean => {
+        if (!(target instanceof Element)) return false;
+        return Boolean(
+            target.closest(
+                '[data-ui-control="true"], button, input, select, textarea, a, [role="button"]'
+            )
+        );
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
+        if (phase !== 'start') {
+            audio.resumeIfNeeded();
+        }
+
+        // Scenario A: When ESC is pressed while unlocked, release any held movement keys
+        // without forcing the Settings modal open, keeping the gameplay canvas clickable.
         if (e.code === 'Escape') {
-            if (phase === 'exploring' || phase === 'approaching' || phase === 'nearMonolith') {
+            if (isActiveExplorationPhase()) {
                 player.clearInputs();
-                setPhase('paused');
+                isDraggingFallbackLook = false;
+                if (
+                    document.pointerLockElement === renderer.domElement &&
+                    document.exitPointerLock
+                ) {
+                    try {
+                        document.exitPointerLock();
+                    } catch {
+                        // Browser already handles ESC pointer lock release natively
+                    }
+                }
+            } else if (phase === 'paused') {
+                // Allow pressing ESC while Settings is open to close Settings
+                const dist = getDistanceToMonolith();
+                if (dist <= WORLD_CONFIG.INTERACTION_DISTANCE) {
+                    setPhase('nearMonolith');
+                } else if (dist <= WORLD_CONFIG.APPROACH_DISTANCE) {
+                    setPhase('approaching');
+                } else {
+                    setPhase('exploring');
+                }
             }
             return;
         }
@@ -196,60 +286,129 @@ export function createGame(
     };
 
     const onMouseMove = (e: MouseEvent) => {
-        const canLook =
-            phase === 'exploring' ||
-            phase === 'approaching' ||
-            phase === 'nearMonolith' ||
-            phase === 'reflection';
-
+        const canLook = isActiveExplorationPhase() || phase === 'reflection';
         if (!canLook) return;
 
         const lookWeight = phase === 'reflection' ? 0.35 : 1.0;
+
+        // 1. Primary path: Browser pointer lock is active on our gameplay canvas
         if (document.pointerLockElement === renderer.domElement) {
-            player.rotateLook(e.movementX * lookWeight, e.movementY * lookWeight, settings.sensitivity);
-        } else if (isDraggingLook) {
+            // Guard against occasional browser spikes on the frame pointer lock engages
+            if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) {
+                return;
+            }
+            player.rotateLook(
+                e.movementX * lookWeight,
+                e.movementY * lookWeight,
+                settings.sensitivity
+            );
+            return;
+        }
+
+        // 2. Strictly restricted fallback: Only allow click-drag look during reflection
+        // (when pointer lock is intentionally released) or if pointer lock is unsupported.
+        if (
+            isDraggingFallbackLook &&
+            (phase === 'reflection' || !pointerLockSupported)
+        ) {
             const dx = e.clientX - lastPointerX;
             const dy = e.clientY - lastPointerY;
             lastPointerX = e.clientX;
             lastPointerY = e.clientY;
             dragMovedDistance += Math.hypot(dx, dy);
-            player.rotateLook(dx * lookWeight, dy * lookWeight, settings.sensitivity);
+            player.rotateLook(
+                dx * lookWeight,
+                dy * lookWeight,
+                settings.sensitivity
+            );
         }
     };
 
-    const onMouseDown = (e: MouseEvent) => {
+    const onCanvasMouseDown = (e: MouseEvent) => {
         if (e.button !== 0) return;
-        if (phase === 'start' || phase === 'paused' || phase === 'resetting') return;
+        if (isUIControlTarget(e.target)) return;
 
-        isDraggingLook = true;
+        if (phase !== 'start') {
+            audio.resumeIfNeeded();
+        }
+        if (!isActiveExplorationPhase() && phase !== 'reflection') return;
+
         dragMovedDistance = 0;
         lastPointerX = e.clientX;
         lastPointerY = e.clientY;
+
+        // Only arm drag-look fallback if in reflection or if the browser lacks Pointer Lock support
+        if (
+            document.pointerLockElement !== renderer.domElement &&
+            (phase === 'reflection' || !pointerLockSupported)
+        ) {
+            isDraggingFallbackLook = true;
+        } else {
+            isDraggingFallbackLook = false;
+        }
     };
 
-    const onMouseUp = (e: MouseEvent) => {
+    /**
+     * Scenario B: Clicking the gameplay canvas during active exploration
+     * immediately and synchronously requests pointer lock on the Three.js canvas,
+     * unless the click directly activated the 3D monolith in interaction range.
+     */
+    const onCanvasClick = (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (isUIControlTarget(e.target)) return;
+
         const wasClick = dragMovedDistance < 7;
-        isDraggingLook = false;
+        isDraggingFallbackLook = false;
 
-        if (!wasClick || phase !== 'nearMonolith') return;
+        if (!isActiveExplorationPhase()) return;
 
-        const ndc = new THREE.Vector2(0, 0);
-        if (document.pointerLockElement !== renderer.domElement) {
-            const rect = renderer.domElement.getBoundingClientRect();
-            ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-            ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        audio.resumeIfNeeded();
+
+        // Check if the player clicked directly on the 3D monolith while within interaction range
+        if (wasClick && phase === 'nearMonolith') {
+            const ndc = new THREE.Vector2(0, 0);
+            if (document.pointerLockElement !== renderer.domElement) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            }
+
+            raycaster.setFromCamera(ndc, camera);
+            const hits = raycaster.intersectObjects(monolith.interactionMeshes, false);
+            if (hits.length > 0) {
+                triggerMonolithEncounter();
+                return;
+            }
         }
 
-        raycaster.setFromCamera(ndc, camera);
-        const hits = raycaster.intersectObjects(monolith.interactionMeshes, false);
-        if (hits.length > 0) {
-            triggerMonolithEncounter();
+        // Restore pointer lock immediately on any ordinary gameplay canvas click
+        if (document.pointerLockElement !== renderer.domElement) {
+            requestGamePointerLock();
         }
     };
 
-    const onPointerLockChange = () => {
+    const onWindowMouseUp = () => {
+        isDraggingFallbackLook = false;
+    };
+
+    const handlePointerLockChange = () => {
         const locked = document.pointerLockElement === renderer.domElement;
+        isPointerLocked = locked;
+        isDraggingFallbackLook = false;
+
+        if (!locked) {
+            // Clear held movement keys when pointer lock is released (e.g. via ESC)
+            // so the player doesn't keep walking while using the visible cursor.
+            player.clearInputs();
+        }
+
         callbacks.onPointerLockChange(locked);
+    };
+
+    const handlePointerLockError = () => {
+        isPointerLocked = document.pointerLockElement === renderer.domElement;
+        isDraggingFallbackLook = false;
+        callbacks.onPointerLockChange(isPointerLocked);
     };
 
     const onResize = () => {
@@ -263,19 +422,23 @@ export function createGame(
     };
 
     const onVisibilityChange = () => {
-        if (document.hidden && (phase === 'exploring' || phase === 'approaching' || phase === 'nearMonolith')) {
+        audio.handleVisibilityChange(document.hidden);
+        if (document.hidden && isActiveExplorationPhase()) {
             player.clearInputs();
+            isDraggingFallbackLook = false;
         }
     };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    renderer.domElement.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('pointerlockchange', onPointerLockChange);
+    window.addEventListener('mouseup', onWindowMouseUp);
+    renderer.domElement.addEventListener('mousedown', onCanvasMouseDown);
+    renderer.domElement.addEventListener('click', onCanvasClick);
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    document.addEventListener('pointerlockerror', handlePointerLockError);
     window.addEventListener('resize', onResize);
-    window.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     let lastTime = performance.now();
     let elapsedTime = 0;
@@ -291,12 +454,11 @@ export function createGame(
         const dt = Math.min(rawDt, 0.1);
         elapsedTime += dt;
 
-        const canWalk =
-            phase === 'exploring' || phase === 'approaching' || phase === 'nearMonolith';
+        audio.update(dt);
 
+        const canWalk = isActiveExplorationPhase();
         const moveResult = player.update(dt, canWalk, allColliders);
 
-        // Position the subtle near-ground visibility light slightly ahead of the player
         nearGroundLight.position.set(
             player.position.x - Math.sin(player.yaw) * 2.2,
             player.position.y - 0.35,
@@ -367,7 +529,7 @@ export function createGame(
 
     return {
         startJourney() {
-            audio.initFromUserGesture(settings.muted);
+            audio.initFromUserGesture(settings);
             runDistanceWalked = 0;
             hintDismissReported = false;
             player.resetToSpawn();
@@ -375,7 +537,7 @@ export function createGame(
             environment.reset(player.position);
             monolith.reset();
             setPhase('exploring');
-            requestDesktopPointerLock();
+            requestGamePointerLock();
         },
 
         activateMonolith() {
@@ -386,6 +548,11 @@ export function createGame(
             if (phase === 'resetting') return;
             setPhase('resetting');
             player.clearInputs();
+            audio.setReflectionMode(false);
+            audio.resumeIfNeeded();
+            // Request pointer lock synchronously inside the REIMAGINE click gesture
+            // so the browser does not reject it after the 420ms transition timeout.
+            requestGamePointerLock();
 
             window.setTimeout(() => {
                 if (isDisposed) return;
@@ -395,9 +562,7 @@ export function createGame(
                 starfield.reset(player.position);
                 environment.reset(player.position);
                 monolith.reset();
-                audio.setReflectionMode(false);
                 setPhase('exploring');
-                requestDesktopPointerLock();
             }, 420);
         },
 
@@ -412,24 +577,43 @@ export function createGame(
             } else {
                 setPhase('exploring');
             }
-            requestDesktopPointerLock();
+            requestGamePointerLock();
         },
 
         pauseGame() {
-            if (phase === 'exploring' || phase === 'approaching' || phase === 'nearMonolith') {
+            if (isActiveExplorationPhase()) {
                 player.clearInputs();
-                if (document.pointerLockElement === renderer.domElement && document.exitPointerLock) {
-                    document.exitPointerLock();
+                isDraggingFallbackLook = false;
+                if (
+                    document.pointerLockElement === renderer.domElement &&
+                    document.exitPointerLock
+                ) {
+                    try {
+                        document.exitPointerLock();
+                    } catch {
+                        // Ignore exit errors
+                    }
                 }
                 setPhase('paused');
             }
+        },
+
+        requestPointerLock() {
+            if (isActiveExplorationPhase()) {
+                audio.resumeIfNeeded();
+                requestGamePointerLock();
+            }
+        },
+
+        retryMusicPlayback() {
+            audio.startOrResumeMusic();
         },
 
         updateSettings(newSettings) {
             const qualityChanged = newSettings.quality !== settings.quality;
             settings = { ...newSettings };
             player.reducedMotion = settings.reducedMotion;
-            audio.setMuted(settings.muted);
+            audio.updateSettings(settings);
 
             if (qualityChanged) {
                 renderer.setPixelRatio(getTargetPixelRatio(settings.quality));
@@ -443,12 +627,7 @@ export function createGame(
         },
 
         rotateCameraFromTouch(dx, dy) {
-            if (
-                phase === 'exploring' ||
-                phase === 'approaching' ||
-                phase === 'nearMonolith' ||
-                phase === 'reflection'
-            ) {
+            if (isActiveExplorationPhase() || phase === 'reflection') {
                 const weight = phase === 'reflection' ? 0.35 : 1.0;
                 player.rotateLook(dx * weight, dy * weight, settings.sensitivity);
             }
@@ -460,9 +639,11 @@ export function createGame(
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-            renderer.domElement.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('pointerlockchange', onPointerLockChange);
+            window.removeEventListener('mouseup', onWindowMouseUp);
+            renderer.domElement.removeEventListener('mousedown', onCanvasMouseDown);
+            renderer.domElement.removeEventListener('click', onCanvasClick);
+            document.removeEventListener('pointerlockchange', handlePointerLockChange);
+            document.removeEventListener('pointerlockerror', handlePointerLockError);
             window.removeEventListener('resize', onResize);
             document.removeEventListener('visibilitychange', onVisibilityChange);
 
