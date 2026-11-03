@@ -4,6 +4,7 @@ import {
     DysonIcon,
     PelagicIcon,
     ProductionPanicIcon,
+    StarsRemainIcon,
 } from '../components/Icons';
 
 export const projectsData: ProjectItem[] = [
@@ -50,5 +51,16 @@ export const projectsData: ProjectItem[] = [
         ctaText: 'Respond',
         glowColor: '#ff826d',
         icon: <ProductionPanicIcon />,
+    },
+    {
+        id: 'the-stars-remain',
+        href: '/the-stars-remain/',
+        category: 'A quiet cosmic journey',
+        title: 'The Stars Remain',
+        description: 'Explore a star-lit world, discover a monolith, and reflect on what remains.',
+        tag: '3D exploration',
+        ctaText: 'Begin',
+        glowColor: '#a9c9ff',
+        icon: <StarsRemainIcon />,
     },
 ];

@@ -61,6 +61,22 @@ export const ProductionPanicIcon = (props: SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+export const StarsRemainIcon = (props: SVGProps<SVGSVGElement>) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <path d="m12 2 1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2Z" />
+        <path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" />
+        <path d="M5 17h.01M18 5h.01" />
+    </svg>
+);
+
 export const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
     <svg
         viewBox="0 0 24 24"
