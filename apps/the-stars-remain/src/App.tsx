@@ -21,7 +21,7 @@ export function App() {
     const [settings, setSettings] = useState<GameSettings>({
         muted: false,
         musicMuted: false,
-        musicVolume: 0.60,
+        musicVolume: 0.40,
         sensitivity: 1.0,
         quality: 'high',
         reducedMotion: false
