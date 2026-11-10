@@ -1,5 +1,6 @@
 import { ProjectItem } from '../types/project';
 import {
+    AfterglowIcon,
     CosmoIcon,
     DysonIcon,
     PelagicIcon,
@@ -8,6 +9,17 @@ import {
 } from '../components/Icons';
 
 export const projectsData: ProjectItem[] = [
+    {
+        id: 'afterglow',
+        href: '/afterglow/',
+        category: 'A walk beyond Earth',
+        title: 'Afterglow',
+        description: 'Take a peaceful walk through an alien landscape beneath a ringed planet.',
+        tag: '3D exploration',
+        ctaText: 'Explore',
+        glowColor: '#f4a778',
+        icon: <AfterglowIcon />,
+    },
     {
         id: 'dyson',
         href: '/dyson-sphere/',

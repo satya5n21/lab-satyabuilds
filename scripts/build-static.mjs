@@ -17,6 +17,7 @@ async function copyDirectoryContents(source, destination) {
 const sources = [
   join(repoRoot, 'site', 'dist'),
   join(repoRoot, 'apps', 'dyson-sphere', 'site'),
+  join(repoRoot, 'apps', 'afterglow', 'site'),
   join(repoRoot, 'apps', 'cosmo-music-visualizer', 'dist'),
   join(repoRoot, 'apps', 'pelagic', 'site'),
   join(repoRoot, 'apps', 'production-panic', 'dist'),
@@ -36,9 +37,10 @@ await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 await copyDirectoryContents(sources[0], outputDir);
 await copyDirectoryContents(sources[1], join(outputDir, 'dyson-sphere'));
-await copyDirectoryContents(sources[2], join(outputDir, 'cosmo-music-visualizer'));
-await copyDirectoryContents(sources[3], join(outputDir, 'pelagic'));
-await copyDirectoryContents(sources[4], join(outputDir, 'production-panic'));
-await copyDirectoryContents(sources[5], join(outputDir, 'the-stars-remain'));
+await copyDirectoryContents(sources[2], join(outputDir, 'afterglow'));
+await copyDirectoryContents(sources[3], join(outputDir, 'cosmo-music-visualizer'));
+await copyDirectoryContents(sources[4], join(outputDir, 'pelagic'));
+await copyDirectoryContents(sources[5], join(outputDir, 'production-panic'));
+await copyDirectoryContents(sources[6], join(outputDir, 'the-stars-remain'));
 
 console.log(`Cloudflare static site assembled at ${outputDir}`);

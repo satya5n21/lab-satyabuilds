@@ -77,6 +77,21 @@ export const StarsRemainIcon = (props: SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+export const AfterglowIcon = (props: SVGProps<SVGSVGElement>) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M3.8 12h16.4M12 3.5c2.2 2.3 3.3 5.1 3.3 8.5s-1.1 6.2-3.3 8.5c-2.2-2.3-3.3-5.1-3.3-8.5s1.1-6.2 3.3-8.5Z" />
+    </svg>
+);
+
 export const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
     <svg
         viewBox="0 0 24 24"
