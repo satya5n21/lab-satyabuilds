@@ -92,6 +92,23 @@ export const AfterglowIcon = (props: SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+export const CosmicTimelineIcon = (props: SVGProps<SVGSVGElement>) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <rect x="2.5" y="8.5" width="19" height="7" rx="3.5" />
+        <circle cx="8" cy="12" r="2.2" />
+        <path d="M12.5 12h5" opacity=".6" />
+        <path d="M5 5v1.5M12 4v2.5M19 5v1.5M5 17.5V19M12 17.5V20M19 17.5V19" opacity=".45" />
+    </svg>
+);
+
 export const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
     <svg
         viewBox="0 0 24 24"

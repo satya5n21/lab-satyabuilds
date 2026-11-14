@@ -10,6 +10,11 @@
     gap: 22px;
 }
 
+/* Let an odd final card fill the row instead of leaving a gap. */
+.projects > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
 @media (max-width: 700px) {
     .shell {
         width: min(100% - 32px, 520px);

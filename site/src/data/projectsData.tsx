@@ -1,6 +1,7 @@
 import { ProjectItem } from '../types/project';
 import {
     AfterglowIcon,
+    CosmicTimelineIcon,
     CosmoIcon,
     DysonIcon,
     PelagicIcon,
@@ -74,5 +75,16 @@ export const projectsData: ProjectItem[] = [
         ctaText: 'Respond',
         glowColor: '#ff826d',
         icon: <ProductionPanicIcon />,
+    },
+    {
+        id: 'cosmic-timeline',
+        href: '/cosmic-timeline-btn/',
+        category: '13.8 billion years',
+        title: 'Cosmic Timeline',
+        description: 'Slide a glass lens along a capsule to travel from the Big Bang to today.',
+        tag: 'Interactive timeline',
+        ctaText: 'Travel',
+        glowColor: '#7fb2ff',
+        icon: <CosmicTimelineIcon />,
     },
 ];
