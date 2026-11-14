@@ -8,11 +8,21 @@
   "tag": "SRE simulation",
   "cta": "Respond",
   "accent": "#ff826d",
-  "icon": "production-panic",
   "status": "live",
   "date": "2026-10-24",
   "route": "/production-panic/",
   "output": "dist",
   "media": [],
-  "input": ["pointer", "keyboard"]
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 2000,
+    "click": [
+      "text=start incident",
+      "text=got it"
+    ],
+    "afterClickMs": 7000
+  }
 }

@@ -8,11 +8,23 @@
   "tag": "Interactive timeline",
   "cta": "Travel",
   "accent": "#7fb2ff",
-  "icon": "cosmic-timeline",
   "status": "live",
   "date": "2026-11-14",
   "route": "/cosmic-timeline-btn/",
   "output": "dist",
-  "media": ["canvas2d", "audio"],
-  "input": ["pointer", "keyboard"]
+  "media": [
+    "canvas2d",
+    "audio"
+  ],
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 2500,
+    "click": [
+      "text=galaxies"
+    ],
+    "afterClickMs": 3500
+  }
 }

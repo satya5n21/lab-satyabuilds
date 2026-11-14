@@ -8,11 +8,27 @@
   "tag": "Interactive experience",
   "cta": "Enter",
   "accent": "#67f4ce",
-  "icon": "dyson",
   "status": "live",
   "date": "2026-10-23",
   "route": "/dyson-sphere/",
   "output": "site",
-  "media": ["webgl"],
-  "input": ["pointer", "touch", "keyboard"]
+  "media": [
+    "webgl"
+  ],
+  "input": [
+    "pointer",
+    "touch",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 3000,
+    "click": [
+      "#explore-system-btn",
+      "#hide-ui-btn"
+    ],
+    "afterClickMs": 3500,
+    "hide": [
+      "#restore-ui-btn"
+    ]
+  }
 }

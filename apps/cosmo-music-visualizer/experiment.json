@@ -8,11 +8,23 @@
   "tag": "Audio reactive",
   "cta": "Launch",
   "accent": "#9b80ff",
-  "icon": "cosmo",
   "status": "live",
   "date": "2026-10-23",
   "route": "/cosmo-music-visualizer/",
   "output": "dist",
-  "media": ["canvas2d", "audio"],
-  "input": ["pointer", "keyboard"]
+  "media": [
+    "canvas2d",
+    "audio"
+  ],
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 3000,
+    "click": [
+      "text=synthesized cosmic odyssey"
+    ],
+    "afterClickMs": 4000
+  }
 }

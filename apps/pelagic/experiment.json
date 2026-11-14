@@ -8,11 +8,23 @@
   "tag": "Calm simulation",
   "cta": "Explore",
   "accent": "#56c2d6",
-  "icon": "pelagic",
   "status": "live",
   "date": "2026-10-24",
   "route": "/pelagic/",
   "output": "site",
-  "media": ["webgl"],
-  "input": ["pointer", "touch", "keyboard"]
+  "media": [
+    "webgl"
+  ],
+  "input": [
+    "pointer",
+    "touch",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 15000,
+    "hide": [
+      "#reset-cam-quick-btn",
+      "#settings-toggle-btn"
+    ]
+  }
 }

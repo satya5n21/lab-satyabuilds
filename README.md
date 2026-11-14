@@ -4,7 +4,8 @@ A small monorepo for independent web experiments.
 
 ## Apps
 
-- `site`: React, TypeScript, and Vite lab homepage. It lists experiments from a generated registry.
+- `site`: the lab homepage, plain static HTML, CSS and a little JavaScript with no framework. It is
+  generated from the experiment manifests by `scripts/build-hub.mjs`.
 - `cosmic-timeline-btn`: React, TypeScript, Vite, and Tailwind.
 - `cosmo-music-visualizer`: React, TypeScript, and Vite.
 - `dyson-sphere`: standalone HTML, CSS, and JavaScript.
@@ -15,9 +16,13 @@ A small monorepo for independent web experiments.
 ## Experiment manifests
 
 Every experiment describes itself in `apps/<name>/experiment.json` (title, status, date, route,
-build folder, media and input tags). `npm run registry` validates them and writes the data the
-homepage imports; `scripts/build-static.mjs` uses the same manifests to place each build at its
-route. See `apps/_template/README.md` for the fields and how to add a new experiment.
+build folder, media and input tags). The homepage build validates them and renders the index from
+them, and `scripts/build-static.mjs` uses the same manifests to place each build at its route.
+See `apps/_template/README.md` for the fields and how to add a new experiment.
+
+Homepage thumbnails are screenshots of the experiments: after `npm run build`, run
+`npm run capture` (needs Chrome or Edge installed) and commit the files it writes to
+`site/src/thumbs/`.
 
 ## Run locally
 
@@ -33,11 +38,13 @@ npm run dev:production-panic
 npm run dev:the-stars-remain
 ```
 
-Each command starts its own development server. Vite prints the URL to open.
-These app-specific servers are isolated, so the homepage dev server cannot
-serve the other apps' paths. To test navigation between all apps on one
-origin, use `npm run preview`; it builds the combined site and serves it through
-Wrangler.
+Each command starts its own development server and prints the URL to open.
+`dev:site` serves the homepage on port 5175 and rebuilds it when the source or a
+manifest changes (reload the page to see it). The app-specific servers are isolated,
+so they cannot serve each other's paths; the homepage dev server links through to
+the built experiments only if `npm run build` has been run. To test navigation
+between all apps on one origin, use `npm run preview`; it builds the combined site
+and serves it through Wrangler.
 
 ## Build and deploy to Cloudflare Workers Static Assets
 

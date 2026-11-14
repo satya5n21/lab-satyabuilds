@@ -8,11 +8,22 @@
   "tag": "3D exploration",
   "cta": "Explore",
   "accent": "#f4a778",
-  "icon": "afterglow",
   "status": "live",
   "date": "2026-11-10",
   "route": "/afterglow/",
   "output": "site",
-  "media": ["webgl"],
-  "input": ["pointer-lock", "keyboard"]
+  "media": [
+    "webgl"
+  ],
+  "input": [
+    "pointer-lock",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 10000,
+    "hide": [
+      "#intro",
+      "#hint"
+    ]
+  }
 }

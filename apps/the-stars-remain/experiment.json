@@ -8,11 +8,20 @@
   "tag": "3D exploration",
   "cta": "Begin",
   "accent": "#a9c9ff",
-  "icon": "the-stars-remain",
   "status": "live",
   "date": "2026-11-03",
   "route": "/the-stars-remain/",
   "output": "dist",
-  "media": ["webgl", "audio"],
-  "input": ["pointer-lock", "keyboard", "touch"]
+  "media": [
+    "webgl",
+    "audio"
+  ],
+  "input": [
+    "pointer-lock",
+    "keyboard",
+    "touch"
+  ],
+  "capture": {
+    "waitMs": 10000
+  }
 }

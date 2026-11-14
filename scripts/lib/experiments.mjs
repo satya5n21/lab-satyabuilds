@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const appsDir = join(repoRoot, 'apps');
+export const thumbsDir = join(repoRoot, 'site', 'src', 'thumbs');
 
 export const STATUSES = ['live', 'prototype', 'archived', 'planned'];
 
@@ -122,7 +123,18 @@ export async function loadExperiments({ requireBuilt = false } = {}) {
       }
     }
 
-    experiments.push({ ...manifest, media: manifest.media ?? [], input: manifest.input ?? [], weightKB, outputDir, folder: entry.name });
+    // Thumbnails are produced by `npm run capture` and live next to the homepage source.
+    const hasThumb = await exists(join(thumbsDir, `${manifest.id}.webp`));
+
+    experiments.push({
+      ...manifest,
+      media: manifest.media ?? [],
+      input: manifest.input ?? [],
+      weightKB,
+      hasThumb,
+      outputDir,
+      folder: entry.name,
+    });
   }
 
   const seen = { id: new Map(), number: new Map(), route: new Map() };
