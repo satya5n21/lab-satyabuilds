@@ -114,8 +114,9 @@ export function renderPage(experiments, assets) {
   </div>
 </div>
 <header class="wrap mast">
-  <h1>Index of experiments</h1>
-  <p class="lede">Interactive builds, simulations and visual studies. Each one is a self-contained page: open it, poke at it, close it. New ones are added as they are finished.</p>
+  <p class="eyebrow">Index of experiments · ${padCount(shipped.length)}</p>
+  <h1>Ideas in Motion</h1>
+  <p class="lede">Interactive builds, simulations and visual studies. Each one is its own page: open it, poke at it, close it.</p>
   <ul class="stats">${stats}</ul>
 </header>
 <main class="wrap" id="main">
