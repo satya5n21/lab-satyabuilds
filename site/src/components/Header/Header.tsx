@@ -1,5 +1,5 @@
 import styles from './Header.module.css';
-import logoUrl from '../../../logo.png';
+import logoUrl from '../../assets/logo-128.webp';
 import { GithubIcon, ExternalLinkNEIcon } from '../Icons';
 
 /** ← Edit this one value to update the GitHub link everywhere */
@@ -16,7 +16,7 @@ export function Header({ badgeText, titleLine1, titleHighlight, intro }: HeaderP
     return (
         <header>
             <div className={styles.topline}>
-                <img className={styles.logo} src={logoUrl} alt="Satyabuilds Lab logo" />
+                <img className={styles.logo} src={logoUrl} width={48} height={48} decoding="async" alt="Satyabuilds Lab logo" />
                 <span className={styles.signal} aria-hidden="true" />
                 {badgeText}
 

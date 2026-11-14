@@ -4,13 +4,20 @@ A small monorepo for independent web experiments.
 
 ## Apps
 
-- `site`: React, TypeScript, and Vite lab homepage.
+- `site`: React, TypeScript, and Vite lab homepage. It lists experiments from a generated registry.
 - `cosmic-timeline-btn`: React, TypeScript, Vite, and Tailwind.
 - `cosmo-music-visualizer`: React, TypeScript, and Vite.
 - `dyson-sphere`: standalone HTML, CSS, and JavaScript.
 - `pelagic`: standalone Pelagic calm ocean simulator.
 - `production-panic`: React, TypeScript, and Vite.
 - `the-stars-remain`: React, TypeScript, Vite, and Three.js.
+
+## Experiment manifests
+
+Every experiment describes itself in `apps/<name>/experiment.json` (title, status, date, route,
+build folder, media and input tags). `npm run registry` validates them and writes the data the
+homepage imports; `scripts/build-static.mjs` uses the same manifests to place each build at its
+route. See `apps/_template/README.md` for the fields and how to add a new experiment.
 
 ## Run locally
 

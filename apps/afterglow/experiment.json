@@ -1,0 +1,18 @@
+{
+  "id": "afterglow",
+  "number": 6,
+  "order": 10,
+  "title": "Afterglow",
+  "category": "A walk beyond Earth",
+  "description": "Take a peaceful walk through an alien landscape beneath a ringed planet.",
+  "tag": "3D exploration",
+  "cta": "Explore",
+  "accent": "#f4a778",
+  "icon": "afterglow",
+  "status": "live",
+  "date": "2026-11-10",
+  "route": "/afterglow/",
+  "output": "site",
+  "media": ["webgl"],
+  "input": ["pointer-lock", "keyboard"]
+}

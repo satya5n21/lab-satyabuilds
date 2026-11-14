@@ -1,0 +1,18 @@
+{
+  "id": "cosmo",
+  "number": 2,
+  "order": 40,
+  "title": "Cosmo Music Visualizer",
+  "category": "Sound into color",
+  "description": "Turn a track into a living cosmic scene with an audio-reactive visualizer.",
+  "tag": "Audio reactive",
+  "cta": "Launch",
+  "accent": "#9b80ff",
+  "icon": "cosmo",
+  "status": "live",
+  "date": "2026-10-23",
+  "route": "/cosmo-music-visualizer/",
+  "output": "dist",
+  "media": ["canvas2d", "audio"],
+  "input": ["pointer", "keyboard"]
+}

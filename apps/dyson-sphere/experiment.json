@@ -1,0 +1,18 @@
+{
+  "id": "dyson",
+  "number": 1,
+  "order": 20,
+  "title": "Dyson Sphere Explorer",
+  "category": "Cosmic engineering",
+  "description": "Step into a speculative megastructure and explore a world built around a star.",
+  "tag": "Interactive experience",
+  "cta": "Enter",
+  "accent": "#67f4ce",
+  "icon": "dyson",
+  "status": "live",
+  "date": "2026-10-23",
+  "route": "/dyson-sphere/",
+  "output": "site",
+  "media": ["webgl"],
+  "input": ["pointer", "touch", "keyboard"]
+}

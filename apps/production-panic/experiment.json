@@ -1,0 +1,18 @@
+{
+  "id": "production-panic",
+  "number": 4,
+  "order": 60,
+  "title": "Production Panic",
+  "category": "Incident response",
+  "description": "Stabilize a production incident by reading system signals and choosing your response.",
+  "tag": "SRE simulation",
+  "cta": "Respond",
+  "accent": "#ff826d",
+  "icon": "production-panic",
+  "status": "live",
+  "date": "2026-10-24",
+  "route": "/production-panic/",
+  "output": "dist",
+  "media": [],
+  "input": ["pointer", "keyboard"]
+}

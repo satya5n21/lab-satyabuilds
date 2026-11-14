@@ -1,9 +1,9 @@
 import { cp, mkdir, readdir, rm } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { loadExperiments, repoRoot } from './lib/experiments.mjs';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = join(repoRoot, 'deployment', 'public');
+const siteDist = join(repoRoot, 'site', 'dist');
 
 async function copyDirectoryContents(source, destination) {
   const entries = await readdir(source);
@@ -14,35 +14,22 @@ async function copyDirectoryContents(source, destination) {
   }
 }
 
-const sources = [
-  join(repoRoot, 'site', 'dist'),
-  join(repoRoot, 'apps', 'dyson-sphere', 'site'),
-  join(repoRoot, 'apps', 'afterglow', 'site'),
-  join(repoRoot, 'apps', 'cosmo-music-visualizer', 'dist'),
-  join(repoRoot, 'apps', 'pelagic', 'site'),
-  join(repoRoot, 'apps', 'production-panic', 'dist'),
-  join(repoRoot, 'apps', 'the-stars-remain', 'dist'),
-  join(repoRoot, 'apps', 'cosmic-timeline-btn', 'dist'),
-];
-
 // Check every input before clearing the previous deployment output.
-for (const source of sources) {
-  try {
-    await readdir(source);
-  } catch {
-    throw new Error(`Build input is missing or unreadable: ${source}`);
-  }
+// Each experiment is described by its own apps/<name>/experiment.json.
+const experiments = (await loadExperiments({ requireBuilt: true })).filter((experiment) => experiment.status !== 'planned');
+
+try {
+  await readdir(siteDist);
+} catch {
+  throw new Error(`Build input is missing or unreadable: ${siteDist}`);
 }
 
 await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
-await copyDirectoryContents(sources[0], outputDir);
-await copyDirectoryContents(sources[1], join(outputDir, 'dyson-sphere'));
-await copyDirectoryContents(sources[2], join(outputDir, 'afterglow'));
-await copyDirectoryContents(sources[3], join(outputDir, 'cosmo-music-visualizer'));
-await copyDirectoryContents(sources[4], join(outputDir, 'pelagic'));
-await copyDirectoryContents(sources[5], join(outputDir, 'production-panic'));
-await copyDirectoryContents(sources[6], join(outputDir, 'the-stars-remain'));
-await copyDirectoryContents(sources[7], join(outputDir, 'cosmic-timeline-btn'));
+await copyDirectoryContents(siteDist, outputDir);
 
-console.log(`Cloudflare static site assembled at ${outputDir}`);
+for (const experiment of experiments) {
+  await copyDirectoryContents(experiment.outputDir, join(outputDir, experiment.route));
+}
+
+console.log(`Cloudflare static site assembled at ${outputDir} (${experiments.length} experiments)`);

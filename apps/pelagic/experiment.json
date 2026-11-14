@@ -1,0 +1,18 @@
+{
+  "id": "pelagic",
+  "number": 3,
+  "order": 50,
+  "title": "Pelagic",
+  "category": "Ocean atmosphere",
+  "description": "Drift into a calm ocean simulation shaped by light, water, and gentle motion.",
+  "tag": "Calm simulation",
+  "cta": "Explore",
+  "accent": "#56c2d6",
+  "icon": "pelagic",
+  "status": "live",
+  "date": "2026-10-24",
+  "route": "/pelagic/",
+  "output": "site",
+  "media": ["webgl"],
+  "input": ["pointer", "touch", "keyboard"]
+}

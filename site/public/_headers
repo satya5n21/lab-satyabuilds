@@ -1,0 +1,20 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Vite emits content-hashed filenames under assets/, so they are safe to cache forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/cosmo-music-visualizer/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/production-panic/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/cosmic-timeline-btn/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The Stars Remain also ships an un-hashed theme_song.mp3 in assets/, so only cache the hashed bundles.
+/the-stars-remain/assets/index-*
+  Cache-Control: public, max-age=31536000, immutable

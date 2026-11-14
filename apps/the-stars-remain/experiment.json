@@ -1,0 +1,18 @@
+{
+  "id": "the-stars-remain",
+  "number": 5,
+  "order": 30,
+  "title": "The Stars Remain",
+  "category": "A quiet cosmic journey",
+  "description": "Explore a star-lit world, discover a monolith, and reflect on what remains.",
+  "tag": "3D exploration",
+  "cta": "Begin",
+  "accent": "#a9c9ff",
+  "icon": "the-stars-remain",
+  "status": "live",
+  "date": "2026-11-03",
+  "route": "/the-stars-remain/",
+  "output": "dist",
+  "media": ["webgl", "audio"],
+  "input": ["pointer-lock", "keyboard", "touch"]
+}

@@ -2,6 +2,7 @@ node_modules
 dist/
 *.tsbuildinfo
 /deployment/public/
+/site/src/data/experiments.generated.json
 .env
 .env.*
 !.env.example

@@ -109,7 +109,23 @@ export const CosmicTimelineIcon = (props: SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-export const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
+/** Fallback for experiments whose manifest names no (or an unknown) icon. */
+export const GenericExperimentIcon = (props: SVGProps<SVGSVGElement>) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <path d="M9.5 3h5M10.5 3v6L5 19a1.4 1.4 0 0 0 1.2 2h11.6A1.4 1.4 0 0 0 19 19l-5.5-10V3" />
+        <path d="M7.8 15h8.4" opacity=".6" />
+    </svg>
+);
+
+export const ArrowRightIcon =(props: SVGProps<SVGSVGElement>) => (
     <svg
         viewBox="0 0 24 24"
         fill="none"

@@ -1,0 +1,18 @@
+{
+  "id": "cosmic-timeline",
+  "number": 7,
+  "order": 70,
+  "title": "Cosmic Timeline",
+  "category": "13.8 billion years",
+  "description": "Slide a glass lens along a capsule to travel from the Big Bang to today.",
+  "tag": "Interactive timeline",
+  "cta": "Travel",
+  "accent": "#7fb2ff",
+  "icon": "cosmic-timeline",
+  "status": "live",
+  "date": "2026-11-14",
+  "route": "/cosmic-timeline-btn/",
+  "output": "dist",
+  "media": ["canvas2d", "audio"],
+  "input": ["pointer", "keyboard"]
+}

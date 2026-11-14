@@ -1,0 +1,18 @@
+{
+  "id": "my-experiment",
+  "number": 8,
+  "order": 80,
+  "title": "My Experiment",
+  "category": "One short line above the title",
+  "description": "One or two sentences about what a visitor does here.",
+  "tag": "Interactive experience",
+  "cta": "Enter",
+  "accent": "#72e8ff",
+  "icon": "",
+  "status": "prototype",
+  "date": "2026-01-01",
+  "route": "/my-experiment/",
+  "output": "dist",
+  "media": ["webgl"],
+  "input": ["pointer", "keyboard"]
+}
