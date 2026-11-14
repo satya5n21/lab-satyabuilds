@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#071624" />
+    <link rel="icon" type="image/png" href="./icon.png" />
+    <title>Pelagic</title>
+    <style>
+        :root {
+            --ui-bg: rgba(8, 17, 28, 0.72);
+            --ui-bg-hover: rgba(14, 28, 44, 0.86);
+            --ui-border: rgba(160, 210, 235, 0.18);
+            --ui-border-strong: rgba(160, 210, 235, 0.36);
+            --ui-text: #eaf4f8;
+            --ui-text-muted: #9ab4c4;
+            --ui-accent: #56c2d6;
+            --ui-accent-soft: rgba(86, 194, 214, 0.22);
+            --ui-radius: 12px;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #061320;
+            color: var(--ui-text);
+            font-family: var(--font-sans);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #viewport-container {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        #viewport-container.dragging {
+            cursor: grabbing;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Subtle Loading Veil */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 50% 60%, #0d263b 0%, #05101a 100%);
+            transition: opacity 0.65s ease, visibility 0.65s ease;
+            pointer-events: none;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader-ring {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid rgba(160, 210, 235, 0.16);
+            border-top-color: var(--ui-accent);
+            animation: spin 1s linear infinite;
+            margin-bottom: 14px;
+        }
+
+        .loader-text {
+            font-size: 13px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--ui-text-muted);
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Error / Fallback Overlay */
+        #fallback-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: linear-gradient(180deg, #0d2235 0%, #06121d 100%);
+            text-align: center;
+        }
+
+        #fallback-overlay.visible {
+            display: flex;
+        }
+
+        .fallback-card {
+            max-width: 440px;
+            padding: 28px 24px;
+            border-radius: var(--ui-radius);
+            background: var(--ui-bg);
+            border: 1px solid var(--ui-border);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+        }
+
+        .fallback-card h1 {
+            margin: 0 0 10px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--ui-text);
+        }
+
+        .fallback-card p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.55;
+            color: var(--ui-text-muted);
+        }
+
+        /* Top-Right Controls Bar */
+        .ui-hud {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top, 16px));
+            right: max(16px, env(safe-area-inset-right, 16px));
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .hud-top-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        .icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            min-height: 42px;
+            padding: 0 14px;
+            border-radius: 999px;
+            border: 1px solid var(--ui-border);
+            background: var(--ui-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--ui-text);
+            font-family: var(--font-sans);
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+        }
+
+        .icon-btn:hover,
+        .icon-btn:focus-visible {
+            background: var(--ui-bg-hover);
+            border-color: var(--ui-border-strong);
+            outline: none;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.97);
+        }
+
+        .icon-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Settings Panel */
+        #settings-panel {
+            width: min(310px, calc(100vw - 32px));
+            padding: 18px;
+            border-radius: var(--ui-radius);
+            border: 1px solid var(--ui-border);
+            background: var(--ui-bg);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+            pointer-events: auto;
+            transform-origin: top right;
+            transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+        }
+
+        #settings-panel.closed {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px) scale(0.97);
+            pointer-events: none;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(160, 210, 235, 0.12);
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--ui-text);
+        }
+
+        .panel-subtitle {
+            font-size: 11px;
+            color: var(--ui-text-muted);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 7px;
+            font-size: 12.5px;
+            color: var(--ui-text);
+        }
+
+        .control-value {
+            font-size: 12px;
+            color: var(--ui-accent);
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+        }
+
+        /* Segmented Quality Selector */
+        .segmented-control {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            padding: 3px;
+            border-radius: 8px;
+            background: rgba(3, 9, 15, 0.55);
+            border: 1px solid rgba(160, 210, 235, 0.12);
+        }
+
+        .seg-btn {
+            min-height: 34px;
+            padding: 4px 6px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--ui-text-muted);
+            font-family: var(--font-sans);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.18s ease, color 0.18s ease;
+        }
+
+        .seg-btn:hover,
+        .seg-btn:focus-visible {
+            color: var(--ui-text);
+            outline: none;
+        }
+
+        .seg-btn.active {
+            background: var(--ui-accent-soft);
+            color: var(--ui-text);
+            box-shadow: inset 0 0 0 1px rgba(86, 194, 214, 0.45);
+        }
+
+        /* Range Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 28px;
+            background: transparent;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(160, 210, 235, 0.2);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            margin-top: -6.5px;
+            border-radius: 50%;
+            background: var(--ui-accent);
+            border: 2px solid #081523;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            transition: transform 0.15s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-track {
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(160, 210, 235, 0.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--ui-accent);
+            border: 2px solid #081523;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Action Button & Toggle Row */
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-height: 38px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--ui-border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--ui-text);
+            font-family: var(--font-sans);
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.18s ease, border-color 0.18s ease;
+        }
+
+        .action-btn:hover,
+        .action-btn:focus-visible {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--ui-border-strong);
+            outline: none;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 12px;
+            margin-top: 12px;
+            border-top: 1px solid rgba(160, 210, 235, 0.12);
+            font-size: 12px;
+            color: var(--ui-text-muted);
+            cursor: pointer;
+        }
+
+        .checkbox-row input {
+            accent-color: var(--ui-accent);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* Optional Diagnostics Readout (Hidden by default) */
+        #perf-diagnostics {
+            display: none;
+            margin-top: 10px;
+            padding: 9px 11px;
+            border-radius: 8px;
+            background: rgba(2, 8, 14, 0.65);
+            border: 1px solid rgba(160, 210, 235, 0.12);
+            font-size: 11.5px;
+            line-height: 1.55;
+            color: var(--ui-text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        #perf-diagnostics.visible {
+            display: block;
+        }
+
+        .diag-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .diag-val {
+            color: var(--ui-text);
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 3D Viewport -->
+    <div id="viewport-container" aria-label="Interactive 3D ocean horizon. Drag to look around."></div>
+
+    <!-- Initial Loading Overlay -->
+    <div id="loading-overlay" role="status" aria-live="polite">
+        <div class="loader-ring"></div>
+        <div class="loader-text">Initializing Ocean</div>
+    </div>
+
+    <!-- Graceful WebGL / Dependency Fallback -->
+    <div id="fallback-overlay" role="alert">
+        <div class="fallback-card">
+            <h1 id="fallback-title">WebGL Graphics Unavailable</h1>
+            <p id="fallback-message">
+                This real-time ocean experience requires a browser with WebGL enabled and an active internet connection
+                to load the Three.js rendering library.
+            </p>
+        </div>
+    </div>
+
+    <!-- Minimal Interface -->
+    <div class="ui-hud">
+        <div class="hud-top-row">
+            <button id="reset-cam-quick-btn" class="icon-btn" type="button" title="Reset Camera View"
+                aria-label="Reset Camera View">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                    <path d="M3 3v5h5" />
+                </svg>
+                <span>Reset View</span>
+            </button>
+
+            <button id="settings-toggle-btn" class="icon-btn" type="button" aria-expanded="false"
+                aria-controls="settings-panel">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Settings</span>
+            </button>
+        </div>
+
+        <section id="settings-panel" class="closed" aria-label="Ocean & Graphics Settings">
+            <div class="panel-header">
+                <span class="panel-title">Environment</span>
+                <span id="active-tier-badge" class="panel-subtitle">Auto (Med)</span>
+            </div>
+
+            <!-- Quality Tier Control -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span>Render Quality</span>
+                </div>
+                <div class="segmented-control" role="radiogroup" aria-label="Render Quality">
+                    <button type="button" class="seg-btn active" data-quality="auto" role="radio"
+                        aria-checked="true">Auto</button>
+                    <button type="button" class="seg-btn" data-quality="low" role="radio"
+                        aria-checked="false">Low</button>
+                    <button type="button" class="seg-btn" data-quality="medium" role="radio"
+                        aria-checked="false">Med</button>
+                    <button type="button" class="seg-btn" data-quality="high" role="radio"
+                        aria-checked="false">High</button>
+                </div>
+            </div>
+
+            <!-- Wave Swell Intensity -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <label for="wave-slider">Wave Swell</label>
+                    <span id="wave-value" class="control-value">100%</span>
+                </div>
+                <input id="wave-slider" type="range" min="0.2" max="1.8" step="0.02" value="1.0" />
+            </div>
+
+            <!-- Sun Elevation / Atmosphere Control -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <label for="sun-slider">Sun Elevation</label>
+                    <span id="sun-value" class="control-value">Golden Morning</span>
+                </div>
+                <input id="sun-slider" type="range" min="0.03" max="0.52" step="0.005" value="0.14" />
+            </div>
+
+            <div class="panel-actions">
+                <button id="reset-cam-btn" type="button" class="action-btn">Center Horizon</button>
+            </div>
+
+            <label class="checkbox-row" for="perf-toggle">
+                <span>Show Performance Stats</span>
+                <input id="perf-toggle" type="checkbox" />
+            </label>
+
+            <div id="perf-diagnostics" aria-live="off">
+                <div class="diag-row"><span>Frame Rate:</span><span id="diag-fps" class="diag-val">-- FPS</span></div>
+                <div class="diag-row"><span>Frame Time:</span><span id="diag-ms" class="diag-val">-- ms</span></div>
+                <div class="diag-row"><span>Active Tier:</span><span id="diag-tier" class="diag-val">--</span></div>
+                <div class="diag-row"><span>Pixel Ratio:</span><span id="diag-dpr" class="diag-val">--</span></div>
+                <div class="diag-row"><span>Ocean Mesh:</span><span id="diag-verts" class="diag-val">-- verts</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Version-Pinned Three.js Dependency (Requires Internet Connection) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+
+    <script>
+        (function () {
+            'use strict';
+
+            /* ============================================================================
+             * 1. SHARED GLSL ATMOSPHERE, TONEMAPPING & WAVE LIBRARY
+             * Shared between the Sky Dome and Ocean Surface shaders so reflections,
+             * horizon haze, and lighting colors match with zero seam at the horizon.
+             * ============================================================================ */
+            var SHARED_ATMOSPHERE_GLSL = [
+                'const float PI = 3.14159265359;',
+                'uniform vec3 uSunDir;',
+                'uniform float uTime;',
+                'uniform float uQualityLevel;',
+
+                '// Narkowicz ACES Filmic Tone Mapping + sRGB Transfer',
+                'vec3 tonemapACES(vec3 x) {',
+                '  const float a = 2.51;',
+                '  const float b = 0.03;',
+                '  const float c = 2.43;',
+                '  const float d = 0.59;',
+                '  const float e = 0.14;',
+                '  vec3 mapped = clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);',
+                '  return pow(mapped, vec3(1.0 / 2.2));',
+                '}',
+
+                '// Lightweight 2D value noise for subtle high-altitude cirrus wisps',
+                'float hash21(vec2 p) {',
+                '  p = fract(p * vec2(234.34, 435.345));',
+                '  p += dot(p, p + 34.23);',
+                '  return fract(p.x * p.y);',
+                '}',
+
+                'float noise2D(vec2 p) {',
+                '  vec2 i = floor(p);',
+                '  vec2 f = fract(p);',
+                '  vec2 u = f * f * (3.0 - 2.0 * f);',
+                '  float a = hash21(i);',
+                '  float b = hash21(i + vec2(1.0, 0.0));',
+                '  float c = hash21(i + vec2(0.0, 1.0));',
+                '  float d = hash21(i + vec2(1.0, 1.0));',
+                '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
+                '}',
+
+                '// Analytical Rayleigh + Mie Atmospheric Scattering Model',
+                'vec3 computeAtmosphere(vec3 rayDir, bool includeSunDisk, bool includeClouds) {',
+                '  float sunY = clamp(uSunDir.y, 0.02, 0.85);',
+                '  float dayFactor = smoothstep(0.02, 0.36, sunY);',
+                '  float goldenFactor = 1.0 - smoothstep(0.05, 0.34, sunY);',
+
+                '  // Upper zenith and horizon base palettes shifted by solar elevation',
+                '  vec3 zenithLow  = vec3(0.045, 0.115, 0.235);',
+                '  vec3 zenithHigh = vec3(0.075, 0.255, 0.520);',
+                '  vec3 zenithCol  = mix(zenithLow, zenithHigh, dayFactor);',
+
+                '  vec3 horizonLow  = vec3(0.760, 0.450, 0.310);',
+                '  vec3 horizonMid  = vec3(0.550, 0.690, 0.800);',
+                '  vec3 horizonHigh = vec3(0.490, 0.700, 0.860);',
+                '  vec3 horizonCol  = mix(horizonLow, mix(horizonMid, horizonHigh, dayFactor), smoothstep(0.02, 0.24, sunY));',
+
+                '  // Vertical optical depth curve',
+                '  float y = max(rayDir.y, 0.0);',
+                '  float horizonCurve = pow(1.0 - y, 3.2);',
+                '  vec3 sky = mix(zenithCol, horizonCol, horizonCurve);',
+
+                '  // Azimuthal warm glow toward the sun along the horizon',
+                '  float sunTheta = max(dot(rayDir, uSunDir), 0.0);',
+                '  float horizAzimuth = max(dot(normalize(vec3(rayDir.x, 0.0, rayDir.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);',
+                '  vec3 warmGlowCol = mix(vec3(1.05, 0.50, 0.22), vec3(0.95, 0.82, 0.64), dayFactor);',
+                '  sky += warmGlowCol * pow(horizAzimuth, 3.0) * pow(1.0 - y, 4.5) * (0.35 + 0.45 * goldenFactor);',
+
+                '  // Solar Mie forward-scattering aureole',
+                '  float mieLobe = pow(sunTheta, 8.0) * 0.22 + pow(sunTheta, 64.0) * 0.48;',
+                '  vec3 sunLightTint = mix(vec3(1.18, 0.62, 0.32), vec3(1.08, 0.96, 0.84), dayFactor);',
+                '  sky += sunLightTint * mieLobe * (0.65 + 0.35 * (1.0 - y));',
+
+                '  // Lightweight high-altitude cirrus bands (Medium & High tiers only)',
+                '  if (includeClouds && uQualityLevel > 0.5 && rayDir.y > 0.015) {',
+                '    vec2 cloudUV = rayDir.xz / (rayDir.y + 0.14) * 1.15;',
+                '    cloudUV += vec2(uTime * 0.004, uTime * 0.0015);',
+                '    float n1 = noise2D(cloudUV * 1.6);',
+                '    float n2 = noise2D(cloudUV * 3.7 + vec2(n1 * 0.65));',
+                '    float cirrus = smoothstep(0.54, 0.84, n1 * 0.62 + n2 * 0.38);',
+                '    float cloudFade = smoothstep(0.02, 0.18, rayDir.y) * (1.0 - smoothstep(0.45, 0.85, rayDir.y));',
+                '    vec3 cloudColor = mix(horizonCol * 1.08, sunLightTint * 1.15, pow(sunTheta, 3.0) * 0.7 + 0.2);',
+                '    sky = mix(sky, cloudColor, cirrus * cloudFade * 0.32);',
+                '  }',
+
+                '  // Crisp solar disk with soft limb roll-off',
+                '  if (includeSunDisk) {',
+                '    float sunCore = smoothstep(0.99945, 0.99988, sunTheta);',
+                '    float sunCorona = pow(sunTheta, 520.0) * 1.4;',
+                '    sky += sunLightTint * (sunCore * 5.5 + sunCorona);',
+                '  }',
+
+                '  // Sub-horizon bounce fallback for reflected rays',
+                '  if (rayDir.y < 0.0) {',
+                '    vec3 abyssBounce = mix(vec3(0.03, 0.10, 0.17), horizonCol * 0.65, exp(rayDir.y * 8.0));',
+                '    sky = mix(abyssBounce, sky, smoothstep(-0.18, 0.0, rayDir.y));',
+                '  }',
+
+                '  return sky;',
+                '}'
+            ].join('\n');
+
+            /* ============================================================================
+             * 2. SKY DOME SHADERS
+             * ============================================================================ */
+            var SKY_VERTEX_SHADER = [
+                'varying vec3 vWorldDir;',
+                'void main() {',
+                '  vec4 worldPos = modelMatrix * vec4(position, 1.0);',
+                '  vWorldDir = worldPos.xyz;',
+                '  gl_Position = projectionMatrix * viewMatrix * worldPos;',
+                '}'
+            ].join('\n');
+
+            var SKY_FRAGMENT_SHADER = [
+                'varying vec3 vWorldDir;',
+                SHARED_ATMOSPHERE_GLSL,
+                'void main() {',
+                '  vec3 dir = normalize(vWorldDir);',
+                '  vec3 col = computeAtmosphere(dir, true, true);',
+                '  gl_FragColor = vec4(tonemapACES(col), 1.0);',
+                '}'
+            ].join('\n');
+
+            /* ============================================================================
+             * 3. PROCEDURAL GERSTNER OCEAN SHADERS (VERTEX + FRAGMENT COHERENT)
+             * ============================================================================ */
+            var WATER_VERTEX_SHADER = [
+                'uniform float uTime;',
+                'uniform float uWaveIntensity;',
+                'uniform float uQualityLevel;',
+                'uniform float uOceanRadius;',
+
+                'varying vec3 vWorldPos;',
+                'varying vec3 vVertexNormal;',
+                'varying float vCrestFactor;',
+                'varying float vDistAtten;',
+
+                '// Evaluates a single directional Gerstner wave contribution',
+                '// dirWavelengthSpeed = vec4(dirX, dirZ, k = 2*PI/wavelength, speed)',
+                '// steepAmp = vec2(steepness Q, amplitude A)',
+                'void accumulateGerstner(',
+                '  vec2 xz,',
+                '  vec4 dirKSpeed,',
+                '  vec2 steepAmp,',
+                '  inout vec3 offset,',
+                '  inout vec3 tangent,',
+                '  inout vec3 binormal,',
+                '  inout float jacobian',
+                ') {',
+                '  vec2 d = dirKSpeed.xy;',
+                '  float k = dirKSpeed.z;',
+                '  float w = dirKSpeed.w;',
+                '  float q = steepAmp.x;',
+                '  float a = steepAmp.y;',
+
+                '  float phase = k * dot(d, xz) - w * uTime;',
+                '  float s = sin(phase);',
+                '  float c = cos(phase);',
+
+                '  offset.x += d.x * (q * a) * c;',
+                '  offset.y += a * s;',
+                '  offset.z += d.y * (q * a) * c;',
+
+                '  float ka = k * a;',
+                '  float qka = q * ka;',
+
+                '  tangent.x  -= d.x * d.x * qka * s;',
+                '  tangent.y  += d.x * ka * c;',
+                '  tangent.z  -= d.x * d.y * qka * s;',
+
+                '  binormal.x -= d.x * d.y * qka * s;',
+                '  binormal.y += d.y * ka * c;',
+                '  binormal.z -= d.y * d.y * qka * s;',
+
+                '  jacobian += qka * s;',
+                '}',
+
+                'void main() {',
+                '  vec3 basePos = position;',
+                '  float radialDist = length(basePos.xz);',
+
+                '  // Smoothly attenuate wave displacement toward the far horizon',
+                '  // so the water surface merges seamlessly into the sky horizon.',
+                '  float horizonFade = 1.0 - smoothstep(uOceanRadius * 0.28, uOceanRadius * 0.92, radialDist);',
+                '  vDistAtten = horizonFade;',
+
+                '  float scale = uWaveIntensity * horizonFade;',
+                '  vec2 xz = basePos.xz;',
+
+                '  vec3 disp = vec3(0.0);',
+                '  vec3 tangent = vec3(1.0, 0.0, 0.0);',
+                '  vec3 binormal = vec3(0.0, 0.0, 1.0);',
+                '  float jacobian = 0.0;',
+
+                '  // Primary long-period ocean swells (always active)',
+                '  accumulateGerstner(xz, vec4( 0.9487, -0.3162, 0.072, 0.84), vec2(0.32, 0.62 * scale), disp, tangent, binormal, jacobian);',
+                '  accumulateGerstner(xz, vec4( 0.8321,  0.5547, 0.108, 1.03), vec2(0.30, 0.44 * scale), disp, tangent, binormal, jacobian);',
+                '  accumulateGerstner(xz, vec4( 0.9923,  0.1240, 0.165, 1.27), vec2(0.28, 0.28 * scale), disp, tangent, binormal, jacobian);',
+                '  accumulateGerstner(xz, vec4( 0.7071, -0.7071, 0.240, 1.53), vec2(0.25, 0.18 * scale), disp, tangent, binormal, jacobian);',
+                '  accumulateGerstner(xz, vec4( 0.4472,  0.8944, 0.360, 1.88), vec2(0.24, 0.12 * scale), disp, tangent, binormal, jacobian);',
+                '  accumulateGerstner(xz, vec4(-0.2425, -0.9701, 0.520, 2.25), vec2(0.22, 0.075 * scale), disp, tangent, binormal, jacobian);',
+
+                '  // Secondary cross-chop swells (Medium & High tiers)',
+                '  if (uQualityLevel > 0.5) {',
+                '    accumulateGerstner(xz, vec4( 0.8819, -0.4714, 0.780, 2.76), vec2(0.20, 0.048 * scale), disp, tangent, binormal, jacobian);',
+                '    accumulateGerstner(xz, vec4( 0.6000,  0.8000, 1.150, 3.35), vec2(0.18, 0.032 * scale), disp, tangent, binormal, jacobian);',
+                '  }',
+
+                '  vec3 displacedPos = basePos + disp;',
+                '  vec4 worldPosition = modelMatrix * vec4(displacedPos, 1.0);',
+                '  vWorldPos = worldPosition.xyz;',
+
+                '  // Analytical surface normal from crossed partial derivatives',
+                '  vVertexNormal = normalize(cross(binormal, tangent));',
+
+                '  // Crest compression & elevation metric for subsurface scatter and foam',
+                '  float heightNorm = clamp((disp.y / max(0.35, 1.15 * uWaveIntensity)) * 0.5 + 0.5, 0.0, 1.0);',
+                '  vCrestFactor = clamp(jacobian * 0.55 + heightNorm * 0.45, 0.0, 1.5);',
+
+                '  gl_Position = projectionMatrix * viewMatrix * worldPosition;',
+                '}'
+            ].join('\n');
+
+            var WATER_FRAGMENT_SHADER = [
+                'uniform vec3 uCameraPos;',
+                'uniform float uWaveIntensity;',
+                'uniform float uOceanRadius;',
+
+                'varying vec3 vWorldPos;',
+                'varying vec3 vVertexNormal;',
+                'varying float vCrestFactor;',
+                'varying float vDistAtten;',
+
+                SHARED_ATMOSPHERE_GLSL,
+
+                '// Analytical micro-undulation normal slope for close-to-mid range water detail',
+                '// Fades out smoothly with distance to prevent horizon aliasing/shimmering.',
+                'vec2 computeFineSlope(vec2 xz, float distFade) {',
+                '  if (distFade <= 0.001) return vec2(0.0);',
+                '  vec2 slope = vec2(0.0);',
+
+                '  // Layer 1: Gentle capillary undulation',
+                '  vec2 d1 = vec2(0.866, 0.500);',
+                '  float p1 = dot(d1, xz) * 1.85 - uTime * 3.1;',
+                '  slope += d1 * cos(p1) * 0.042;',
+
+                '  // Layer 2: Cross ripple',
+                '  vec2 d2 = vec2(0.529, -0.848);',
+                '  float p2 = dot(d2, xz) * 2.95 - uTime * 3.9;',
+                '  slope += d2 * cos(p2) * 0.032;',
+
+                '  // Layer 3: Fine surface texture (Medium & High tiers)',
+                '  if (uQualityLevel > 0.5) {',
+                '    vec2 d3 = vec2(-0.342, 0.940);',
+                '    float p3 = dot(d3, xz) * 4.70 - uTime * 4.8;',
+                '    slope += d3 * cos(p3) * 0.022;',
+                '  }',
+
+                '  // Layer 4: High-tier crisp sunlit ripple facet',
+                '  if (uQualityLevel > 1.5) {',
+                '    vec2 d4 = vec2(0.940, -0.342);',
+                '    float p4 = dot(d4, xz) * 7.40 + uTime * 5.6;',
+                '    slope += d4 * cos(p4) * 0.014;',
+                '  }',
+
+                '  return slope * distFade * clamp(uWaveIntensity, 0.35, 1.45);',
+                '}',
+
+                'void main() {',
+                '  vec3 viewVec = uCameraPos - vWorldPos;',
+                '  float dist = length(viewVec);',
+                '  vec3 V = viewVec / max(dist, 0.0001);',
+
+                '  // Distance-based LOD attenuation for fine surface normals (anti-aliasing)',
+                '  float microFade = (1.0 - smoothstep(12.0, 210.0, dist)) * vDistAtten;',
+                '  vec2 fineSlope = computeFineSlope(vWorldPos.xz, microFade);',
+
+                '  vec3 N = normalize(vec3(',
+                '    vVertexNormal.x - fineSlope.x,',
+                '    vVertexNormal.y,',
+                '    vVertexNormal.z - fineSlope.y',
+                '  ));',
+
+                '  // Ensure normal faces viewer at extreme grazing angles to avoid black fringes',
+                '  float NdotV = max(dot(N, V), 0.001);',
+
+                '  // Schlick Fresnel with realistic water refractive index (F0 = 0.02)',
+                '  float fresnel = 0.02 + 0.98 * pow(1.0 - NdotV, 5.0);',
+                '  fresnel = clamp(fresnel, 0.02, 0.96);',
+
+                '  // Reflected sky ray with subtle upward clamp to model wave inter-reflection',
+                '  vec3 R = reflect(-V, N);',
+                '  R.y = max(R.y, -0.04);',
+                '  R = normalize(R);',
+                '  vec3 skyReflection = computeAtmosphere(R, false, false);',
+
+                '  // Deep water absorption & depth-inspired gradient (Abyssal Navy -> Pelagic Blue -> Teal)',
+                '  float sunY = clamp(uSunDir.y, 0.02, 0.85);',
+                '  float dayLight = smoothstep(0.02, 0.36, sunY);',
+                '  vec3 deepAbyssCol = mix(vec3(0.008, 0.032, 0.068), vec3(0.012, 0.058, 0.115), dayLight);',
+                '  vec3 pelagicBlue  = mix(vec3(0.018, 0.075, 0.135), vec3(0.024, 0.135, 0.225), dayLight);',
+                '  vec3 shallowTeal  = mix(vec3(0.045, 0.180, 0.230), vec3(0.055, 0.310, 0.365), dayLight);',
+
+                '  float depthFactor = pow(NdotV, 0.65);',
+                '  vec3 waterBodyCol = mix(pelagicBlue, deepAbyssCol, depthFactor);',
+                '  waterBodyCol = mix(waterBodyCol, shallowTeal, smoothstep(0.42, 0.95, vCrestFactor) * 0.38);',
+
+                '  // Diffuse sky irradiance & subsurface wave-crest translucency (SSS)',
+                '  float backLight = pow(max(dot(V, -uSunDir), 0.0), 3.0);',
+                '  float crestTranslucency = smoothstep(0.38, 1.05, vCrestFactor) * vDistAtten;',
+                '  vec3 sssTint = mix(vec3(0.08, 0.36, 0.38), vec3(0.11, 0.48, 0.46), dayLight);',
+                '  vec3 sssContribution = sssTint * crestTranslucency * (0.32 + 0.68 * backLight) * (0.45 + 0.55 * dayLight);',
+
+                '  vec3 refractedWater = waterBodyCol + sssContribution;',
+
+                '  // Combine refracted body color and sky reflection via Fresnel',
+                '  vec3 surfaceCol = mix(refractedWater, skyReflection, fresnel);',
+
+                '  // Coherent Dual-Lobe Sunlight Specular Glints (follows actual wave facets)',
+                '  vec3 H = normalize(uSunDir + V);',
+                '  float NdotH = max(dot(N, H), 0.0);',
+                '  float NdotL = max(dot(N, uSunDir), 0.0);',
+
+                '  // Distance roughness broadening keeps horizon glints coherent rather than noisy',
+                '  float glintSharpness = mix(720.0, 240.0, smoothstep(10.0, 350.0, dist));',
+                '  float sunGlintCore = pow(NdotH, glintSharpness) * 3.8;',
+                '  float sunGlintPath = pow(NdotH, 42.0) * 0.26;',
+
+                '  vec3 sunSpecTint = mix(vec3(1.25, 0.64, 0.32), vec3(1.15, 0.98, 0.84), dayLight);',
+                '  float specMask = smoothstep(-0.02, 0.12, NdotL);',
+                '  surfaceCol += sunSpecTint * (sunGlintCore + sunGlintPath) * specMask * (0.35 + 0.65 * fresnel);',
+
+                '  // Restrained crest foam accents only where steep wave crests compress',
+                '  if (uWaveIntensity > 0.75 && vDistAtten > 0.15) {',
+                '    float foamThreshold = mix(1.08, 0.72, clamp((uWaveIntensity - 0.75) / 1.05, 0.0, 1.0));',
+                '    float crestMask = smoothstep(foamThreshold, foamThreshold + 0.32, vCrestFactor);',
+                '    if (crestMask > 0.005) {',
+                '      float foamPattern = noise2D(vWorldPos.xz * 0.85 + vec2(uTime * 0.18, -uTime * 0.12));',
+                '      float foam = crestMask * smoothstep(0.36, 0.78, foamPattern) * vDistAtten * 0.52;',
+                '      vec3 foamCol = mix(vec3(0.68, 0.64, 0.62), vec3(0.84, 0.90, 0.94), dayLight);',
+                '      surfaceCol = mix(surfaceCol, foamCol, foam);',
+                '    }',
+                '  }',
+
+                '  // Seamless atmospheric horizon haze integration',
+                '  // Matches the exact sky color along the view ray at the horizon',
+                '  vec3 horizonRay = normalize(vec3( -V.x, max(-V.y, 0.002), -V.z ));',
+                '  vec3 horizonSkyCol = computeAtmosphere(horizonRay, false, false);',
+                '  float fogFactor = smoothstep(uOceanRadius * 0.16, uOceanRadius * 0.94, dist);',
+                '  fogFactor = clamp(fogFactor + (1.0 - vDistAtten) * 0.35, 0.0, 1.0);',
+
+                '  vec3 finalRadiance = mix(surfaceCol, horizonSkyCol, fogFactor);',
+                '  gl_FragColor = vec4(tonemapACES(finalRadiance), 1.0);',
+                '}'
+            ].join('\n');
+
+            /* ============================================================================
+             * 4. CONFIGURATION & QUALITY TIER DEFINITIONS
+             * ============================================================================ */
+            var OCEAN_RADIUS = 2400.0;
+            var DEFAULT_YAW = 0.0;
+            var DEFAULT_PITCH = 0.045; // Subtle downward tilt showing rich foreground water + horizon
+
+            var QUALITY_TIERS = {
+                low: {
+                    id: 'low',
+                    label: 'Low',
+                    shaderLevel: 0.0,
+                    gridSegments: 76,
+                    maxDprMobile: 0.95,
+                    maxDprDesktop: 1.15
+                },
+                medium: {
+                    id: 'medium',
+                    label: 'Med',
+                    shaderLevel: 1.0,
+                    gridSegments: 132,
+                    maxDprMobile: 1.15,
+                    maxDprDesktop: 1.35
+                },
+                high: {
+                    id: 'high',
+                    label: 'High',
+                    shaderLevel: 2.0,
+                    gridSegments: 196,
+                    maxDprMobile: 1.25,
+                    maxDprDesktop: 1.50
+                }
+            };
+
+            /* ============================================================================
+             * 5. APPLICATION STATE
+             * ============================================================================ */
+            var state = {
+                isMobile: false,
+                reducedMotion: false,
+                qualityMode: 'auto',      // 'auto' | 'low' | 'medium' | 'high'
+                activeTierKey: 'medium',  // 'low' | 'medium' | 'high'
+                dprPenaltyScale: 1.0,     // Extra resolution trim if Low tier still struggles
+                currentDpr: 1.0,
+                waveIntensity: 1.0,
+                sunElevation: 0.14,       // Radians-inspired normalized elevation [0.03..0.52]
+                sunAzimuth: 0.0,
+
+                // Camera spherical look state
+                camYaw: DEFAULT_YAW,
+                camPitch: DEFAULT_PITCH,
+                targetYaw: DEFAULT_YAW,
+                targetPitch: DEFAULT_PITCH,
+                isDragging: false,
+                lastPointerX: 0,
+                lastPointerY: 0,
+
+                // Timing & Lifecycle
+                isRunning: false,
+                isContextLost: false,
+                rafId: null,
+                elapsedTime: 0,
+                lastFrameTimestamp: 0,
+
+                // Adaptive Frame Rate Governor with Hysteresis & Cooldown
+                fpsSmoothed: 60.0,
+                frameMsSmoothed: 16.6,
+                lowFpsAccumSec: 0.0,
+                highFpsAccumSec: 0.0,
+                qualityCooldownSec: 4.0,  // Initial warm-up grace period
+                showStats: false,
+                uiUpdateAccumSec: 0.0
+            };
+
+            // Three.js references & cached geometries
+            var renderer = null;
+            var scene = null;
+            var camera = null;
+            var skyMesh = null;
+            var waterMesh = null;
+            var skyMaterial = null;
+            var waterMaterial = null;
+            var geometryCache = {
+                low: null,
+                medium: null,
+                high: null
+            };
+
+            /* ============================================================================
+             * 6. HARDWARE DETECTION & INITIAL QUALITY SELECTION
+             * ============================================================================ */
+            function detectEnvironment() {
+                var coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+                var smallScreen = Math.min(window.innerWidth, window.innerHeight) < 768;
+                var mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+                state.isMobile = Boolean(coarsePointer || smallScreen || mobileUA);
+
+                state.reducedMotion = Boolean(
+                    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                );
+
+                if (state.reducedMotion) {
+                    state.waveIntensity = 0.65;
+                }
+
+                // Conservative initial quality selection
+                var cores = navigator.hardwareConcurrency || 4;
+                var memory = navigator.deviceMemory || 4;
+
+                if (state.isMobile) {
+                    if (cores <= 4 || memory <= 3) {
+                        state.activeTierKey = 'low';
+                    } else {
+                        state.activeTierKey = 'medium';
+                    }
+                } else {
+                    if (cores >= 8 && memory >= 8) {
+                        state.activeTierKey = 'high';
+                    } else {
+                        state.activeTierKey = 'medium';
+                    }
+                }
+            }
+
+            /* ============================================================================
+             * 7. NON-UNIFORM RADIAL-WARPED OCEAN GEOMETRY GENERATOR
+             * Concentrates vertex density near the camera for smooth foreground waves
+             * while extending to 2400m in all directions with low triangle overhead.
+             * ============================================================================ */
+            function getOrCreateOceanGeometry(tierKey) {
+                if (geometryCache[tierKey]) {
+                    return geometryCache[tierKey];
+                }
+
+                var segments = QUALITY_TIERS[tierKey].gridSegments;
+                var geom = new THREE.PlaneBufferGeometry(2.0, 2.0, segments, segments);
+                geom.rotateX(-Math.PI * 0.5);
+
+                var posAttr = geom.attributes.position;
+                var count = posAttr.count;
+
+                for (var i = 0; i < count; i++) {
+                    var nx = posAttr.getX(i); // [-1..1]
+                    var nz = posAttr.getZ(i); // [-1..1]
+
+                    // Radial distance in normalized grid space
+                    var r = Math.sqrt(nx * nx + nz * nz);
+                    if (r > 0.00001) {
+                        var dirX = nx / r;
+                        var dirZ = nz / r;
+                        var clampedR = Math.min(r, 1.42);
+                        // Non-linear power expansion: high detail near origin, expansive reach at edge
+                        var warpedDist = (
+                            0.045 * clampedR +
+                            0.955 * Math.pow(clampedR / 1.41421356, 2.45)
+                        ) * OCEAN_RADIUS;
+
+                        // Offset center slightly forward along -Z so foreground camera has maximum density
+                        var worldX = dirX * warpedDist;
+                        var worldZ = dirZ * warpedDist - 18.0;
+
+                        posAttr.setXYZ(i, worldX, 0.0, worldZ);
+                    } else {
+                        posAttr.setXYZ(i, 0.0, 0.0, -18.0);
+                    }
+                }
+
+                posAttr.needsUpdate = true;
+                geom.computeBoundingSphere();
+                geometryCache[tierKey] = geom;
+                return geom;
+            }
+
+            /* ============================================================================
+             * 8. SUN & ATMOSPHERE UNIFORM UPDATES
+             * ============================================================================ */
+            var sharedUniforms = {
+                uTime: { value: 0.0 },
+                uSunDir: { value: new THREE.Vector3(0.0, 0.14, -0.99) },
+                uCameraPos: { value: new THREE.Vector3(0.0, 3.2, 0.0) },
+                uWaveIntensity: { value: 1.0 },
+                uQualityLevel: { value: 1.0 },
+                uOceanRadius: { value: OCEAN_RADIUS }
+            };
+
+            function updateSunDirection() {
+                var elev = state.sunElevation;
+                var cosElev = Math.cos(elev);
+                var sinElev = Math.sin(elev);
+                var sinAz = Math.sin(state.sunAzimuth);
+                var cosAz = Math.cos(state.sunAzimuth);
+
+                sharedUniforms.uSunDir.value.set(
+                    sinAz * cosElev,
+                    sinElev,
+                    -cosAz * cosElev
+                ).normalize();
+            }
+
+            function describeSunElevation(val) {
+                if (val < 0.075) return 'Sunrise Glow';
+                if (val < 0.18) return 'Golden Morning';
+                if (val < 0.34) return 'Coastal Morning';
+                return 'High Sun';
+            }
+
+            /* ============================================================================
+             * 9. ADAPTIVE QUALITY & PIXEL RATIO MANAGEMENT
+             * ============================================================================ */
+            function computeTargetDpr(tier) {
+                var nativeDpr = window.devicePixelRatio || 1.0;
+                var cap = state.isMobile ? tier.maxDprMobile : tier.maxDprDesktop;
+                var effectiveDpr = Math.min(nativeDpr, cap) * state.dprPenaltyScale;
+                return Math.max(0.75, Math.round(effectiveDpr * 100) / 100);
+            }
+
+            function applyQualityTier(tierKey, resetPenalty) {
+                var tier = QUALITY_TIERS[tierKey] || QUALITY_TIERS.medium;
+                state.activeTierKey = tier.id;
+                if (resetPenalty) {
+                    state.dprPenaltyScale = 1.0;
+                }
+
+                sharedUniforms.uQualityLevel.value = tier.shaderLevel;
+
+                if (waterMesh) {
+                    var targetGeom = getOrCreateOceanGeometry(tier.id);
+                    if (waterMesh.geometry !== targetGeom) {
+                        waterMesh.geometry = targetGeom;
+                    }
+                }
+
+                if (renderer) {
+                    state.currentDpr = computeTargetDpr(tier);
+                    renderer.setPixelRatio(state.currentDpr);
+                    renderer.setSize(window.innerWidth, window.innerHeight, false);
+                }
+
+                updateQualityUI();
+            }
+
+            function evaluateAdaptivePerformance(dt) {
+                // Ignore abnormal frame spikes caused by tab switching
+                if (dt <= 0.0001 || dt > 0.25) return;
+
+                var instantFps = 1.0 / dt;
+                var instantMs = dt * 1000.0;
+
+                // Exponential moving average for smooth telemetry
+                state.fpsSmoothed = state.fpsSmoothed * 0.92 + instantFps * 0.08;
+                state.frameMsSmoothed = state.frameMsSmoothed * 0.92 + instantMs * 0.08;
+
+                if (state.qualityMode !== 'auto') return;
+
+                if (state.qualityCooldownSec > 0.0) {
+                    state.qualityCooldownSec -= dt;
+                    return;
+                }
+
+                // Hysteresis thresholds prevent rapid oscillation
+                if (state.fpsSmoothed < 43.0) {
+                    state.lowFpsAccumSec += dt;
+                    state.highFpsAccumSec = Math.max(0.0, state.highFpsAccumSec - dt * 2.0);
+                } else if (state.fpsSmoothed > 56.8) {
+                    state.highFpsAccumSec += dt;
+                    state.lowFpsAccumSec = Math.max(0.0, state.lowFpsAccumSec - dt * 2.0);
+                } else {
+                    state.lowFpsAccumSec = Math.max(0.0, state.lowFpsAccumSec - dt);
+                    state.highFpsAccumSec = Math.max(0.0, state.highFpsAccumSec - dt);
+                }
+
+                // Sustained slowdown (> 2.2 seconds below threshold): step down quality
+                if (state.lowFpsAccumSec >= 2.2) {
+                    state.lowFpsAccumSec = 0.0;
+                    state.highFpsAccumSec = 0.0;
+                    state.qualityCooldownSec = 5.0;
+
+                    if (state.activeTierKey === 'high') {
+                        applyQualityTier('medium', false);
+                    } else if (state.activeTierKey === 'medium') {
+                        applyQualityTier('low', false);
+                    } else if (state.dprPenaltyScale > 0.82) {
+                        state.dprPenaltyScale = Math.max(0.78, state.dprPenaltyScale - 0.12);
+                        applyQualityTier('low', false);
+                    }
+                }
+                // Sustained headroom (> 9.0 seconds near 60 FPS): cautiously step up
+                else if (state.highFpsAccumSec >= 9.0) {
+                    state.highFpsAccumSec = 0.0;
+                    state.lowFpsAccumSec = 0.0;
+                    state.qualityCooldownSec = 8.0;
+
+                    if (state.dprPenaltyScale < 0.99) {
+                        state.dprPenaltyScale = 1.0;
+                        applyQualityTier(state.activeTierKey, true);
+                    } else if (state.activeTierKey === 'low') {
+                        applyQualityTier('medium', false);
+                    } else if (state.activeTierKey === 'medium' && !state.isMobile) {
+                        // Only auto-promote to High on desktop to protect mobile thermals
+                        applyQualityTier('high', false);
+                    }
+                }
+            }
+
+            /* ============================================================================
+             * 10. SCENE, CAMERA & RENDERER INITIALIZATION
+             * ============================================================================ */
+            function showFallback(title, message) {
+                var loadingEl = document.getElementById('loading-overlay');
+                if (loadingEl) loadingEl.classList.add('hidden');
+
+                var fallbackEl = document.getElementById('fallback-overlay');
+                var titleEl = document.getElementById('fallback-title');
+                var msgEl = document.getElementById('fallback-message');
+                if (titleEl && title) titleEl.textContent = title;
+                if (msgEl && message) msgEl.textContent = message;
+                if (fallbackEl) fallbackEl.classList.add('visible');
+            }
+
+            function isWebGLAvailable() {
+                try {
+                    var testCanvas = document.createElement('canvas');
+                    return Boolean(
+                        window.WebGLRenderingContext &&
+                        (testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl'))
+                    );
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function initScene() {
+                if (typeof window.THREE === 'undefined') {
+                    showFallback(
+                        'Three.js Library Not Loaded',
+                        'An active internet connection is required to load the pinned Three.js library from the CDN.'
+                    );
+                    return false;
+                }
+
+                if (!isWebGLAvailable()) {
+                    showFallback(
+                        'WebGL Not Supported',
+                        'Your browser or device does not currently support WebGL graphics required for the 3D ocean.'
+                    );
+                    return false;
+                }
+
+                var container = document.getElementById('viewport-container');
+
+                try {
+                    renderer = new THREE.WebGLRenderer({
+                        antialias: false, // Analytical shader anti-aliasing avoids MSAA bandwidth cost on mobile
+                        powerPreference: 'high-performance',
+                        depth: true,
+                        stencil: false,
+                        alpha: false,
+                        preserveDrawingBuffer: false
+                    });
+                } catch (err) {
+                    showFallback('Graphics Context Error', 'Could not initialize the WebGL rendering context.');
+                    return false;
+                }
+
+                renderer.setClearColor(0x061320, 1.0);
+                container.appendChild(renderer.domElement);
+
+                // Handle WebGL Context Loss & Restoration
+                renderer.domElement.addEventListener('webglcontextlost', function (e) {
+                    e.preventDefault();
+                    state.isContextLost = true;
+                    stopLoop();
+                }, false);
+
+                renderer.domElement.addEventListener('webglcontextrestored', function () {
+                    state.isContextLost = false;
+                    applyQualityTier(state.activeTierKey, false);
+                    startLoop();
+                }, false);
+
+                scene = new THREE.Scene();
+
+                camera = new THREE.PerspectiveCamera(
+                    55,
+                    window.innerWidth / Math.max(1, window.innerHeight),
+                    0.5,
+                    OCEAN_RADIUS * 1.35
+                );
+                camera.position.set(0.0, 3.2, 0.0);
+                sharedUniforms.uCameraPos.value.copy(camera.position);
+
+                updateSunDirection();
+                sharedUniforms.uWaveIntensity.value = state.waveIntensity;
+
+                // Sky Dome Mesh
+                var skyGeom = new THREE.SphereBufferGeometry(OCEAN_RADIUS * 1.15, 32, 20);
+                skyMaterial = new THREE.ShaderMaterial({
+                    vertexShader: SKY_VERTEX_SHADER,
+                    fragmentShader: SKY_FRAGMENT_SHADER,
+                    uniforms: {
+                        uSunDir: sharedUniforms.uSunDir,
+                        uTime: sharedUniforms.uTime,
+                        uQualityLevel: sharedUniforms.uQualityLevel
+                    },
+                    side: THREE.BackSide,
+                    depthWrite: false
+                });
+                skyMesh = new THREE.Mesh(skyGeom, skyMaterial);
+                skyMesh.frustumCulled = false;
+                scene.add(skyMesh);
+
+                // Ocean Surface Mesh
+                waterMaterial = new THREE.ShaderMaterial({
+                    vertexShader: WATER_VERTEX_SHADER,
+                    fragmentShader: WATER_FRAGMENT_SHADER,
+                    uniforms: sharedUniforms,
+                    side: THREE.FrontSide,
+                    depthWrite: true
+                });
+
+                var initialGeom = getOrCreateOceanGeometry(state.activeTierKey);
+                waterMesh = new THREE.Mesh(initialGeom, waterMaterial);
+                waterMesh.frustumCulled = false;
+                scene.add(waterMesh);
+
+                applyQualityTier(state.activeTierKey, true);
+                updateCameraOrientation(1.0);
+
+                // Render initial frame and check for shader errors
+                renderer.render(scene, camera);
+
+                var gl = renderer.getContext();
+                if (gl && gl.getError() === gl.CONTEXT_LOST_WEBGL) {
+                    showFallback('WebGL Context Lost', 'The graphics driver reset the rendering context.');
+                    return false;
+                }
+
+                // Fade out loading veil
+                var loadingEl = document.getElementById('loading-overlay');
+                if (loadingEl) {
+                    requestAnimationFrame(function () {
+                        loadingEl.classList.add('hidden');
+                    });
+                }
+
+                return true;
+            }
+
+            /* ============================================================================
+             * 11. CAMERA ORIENTATION & INPUT HANDLING
+             * ============================================================================ */
+            var lookTarget = new THREE.Vector3();
+
+            function updateCameraOrientation(dampingFactor) {
+                state.camYaw += (state.targetYaw - state.camYaw) * dampingFactor;
+                state.camPitch += (state.targetPitch - state.camPitch) * dampingFactor;
+
+                // Keep camera roll strictly zero and clamp vertical pitch to peaceful angles
+                var cosPitch = Math.cos(state.camPitch);
+                var sinPitch = Math.sin(state.camPitch);
+                var sinYaw = Math.sin(state.camYaw);
+                var cosYaw = Math.cos(state.camYaw);
+
+                lookTarget.set(
+                    camera.position.x + sinYaw * cosPitch * 100.0,
+                    camera.position.y - sinPitch * 100.0,
+                    camera.position.z - cosYaw * cosPitch * 100.0
+                );
+                camera.lookAt(lookTarget);
+            }
+
+            function resetCameraView() {
+                state.targetYaw = DEFAULT_YAW;
+                state.targetPitch = DEFAULT_PITCH;
+            }
+
+            function bindInteractionEvents() {
+                var container = document.getElementById('viewport-container');
+
+                function onPointerDown(clientX, clientY) {
+                    state.isDragging = true;
+                    state.lastPointerX = clientX;
+                    state.lastPointerY = clientY;
+                    container.classList.add('dragging');
+                }
+
+                function onPointerMove(clientX, clientY) {
+                    if (!state.isDragging) return;
+                    var dx = clientX - state.lastPointerX;
+                    var dy = clientY - state.lastPointerY;
+                    state.lastPointerX = clientX;
+                    state.lastPointerY = clientY;
+
+                    var sensitivity = state.isMobile ? 0.0034 : 0.0024;
+                    state.targetYaw -= dx * sensitivity;
+                    state.targetPitch = Math.max(
+                        -0.42, // Look up into sky
+                        Math.min(0.32, state.targetPitch - dy * sensitivity) // Look down at foreground water
+                    );
+                }
+
+                function onPointerUp() {
+                    state.isDragging = false;
+                    container.classList.remove('dragging');
+                }
+
+                // Mouse Events
+                container.addEventListener('mousedown', function (e) {
+                    if (e.button !== 0) return;
+                    onPointerDown(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mousemove', function (e) {
+                    onPointerMove(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mouseup', onPointerUp);
+
+                // Touch Events (Single-finger drag, prevents accidental page scroll)
+                container.addEventListener('touchstart', function (e) {
+                    if (e.touches.length === 1) {
+                        e.preventDefault();
+                        onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                }, { passive: false });
+
+                container.addEventListener('touchmove', function (e) {
+                    if (e.touches.length === 1) {
+                        e.preventDefault();
+                        onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                }, { passive: false });
+
+                container.addEventListener('touchend', onPointerUp);
+                container.addEventListener('touchcancel', onPointerUp);
+
+                // Keyboard accessibility for looking around
+                window.addEventListener('keydown', function (e) {
+                    var step = 0.05;
+                    if (e.key === 'ArrowLeft') {
+                        state.targetYaw -= step;
+                    } else if (e.key === 'ArrowRight') {
+                        state.targetYaw += step;
+                    } else if (e.key === 'ArrowUp') {
+                        state.targetPitch = Math.max(-0.42, state.targetPitch - step);
+                    } else if (e.key === 'ArrowDown') {
+                        state.targetPitch = Math.min(0.32, state.targetPitch + step);
+                    }
+                });
+
+                // Responsive Viewport & Orientation Resize
+                var resizeTimeout = null;
+                function handleResize() {
+                    if (!renderer || !camera) return;
+                    var w = window.innerWidth;
+                    var h = Math.max(1, window.innerHeight);
+
+                    // Adjust vertical FOV slightly in tall portrait orientation so horizon stays balanced
+                    camera.aspect = w / h;
+                    camera.fov = (w < h) ? 64 : 54;
+                    camera.updateProjectionMatrix();
+
+                    var tier = QUALITY_TIERS[state.activeTierKey];
+                    state.currentDpr = computeTargetDpr(tier);
+                    renderer.setPixelRatio(state.currentDpr);
+                    renderer.setSize(w, h, false);
+                    updateDiagnosticsDOM();
+                }
+
+                window.addEventListener('resize', function () {
+                    if (resizeTimeout) clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(handleResize, 60);
+                });
+
+                window.addEventListener('orientationchange', function () {
+                    setTimeout(handleResize, 120);
+                });
+
+                // Page Visibility Pausing (Saves mobile battery and prevents background GPU heat)
+                document.addEventListener('visibilitychange', function () {
+                    if (document.hidden) {
+                        stopLoop();
+                    } else if (!state.isContextLost) {
+                        startLoop();
+                    }
+                });
+
+                handleResize();
+            }
+
+            /* ============================================================================
+             * 12. UI CONTROLS BINDING
+             * ============================================================================ */
+            function updateQualityUI() {
+                var tier = QUALITY_TIERS[state.activeTierKey];
+                var badgeEl = document.getElementById('active-tier-badge');
+                if (badgeEl) {
+                    badgeEl.textContent = state.qualityMode === 'auto'
+                        ? 'Auto (' + tier.label + ')'
+                        : tier.label + ' Quality';
+                }
+
+                var buttons = document.querySelectorAll('.seg-btn');
+                for (var i = 0; i < buttons.length; i++) {
+                    var btn = buttons[i];
+                    var isSelected = btn.getAttribute('data-quality') === state.qualityMode;
+                    btn.classList.toggle('active', isSelected);
+                    btn.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+                }
+
+                updateDiagnosticsDOM();
+            }
+
+            function updateDiagnosticsDOM() {
+                if (!state.showStats) return;
+                var tier = QUALITY_TIERS[state.activeTierKey];
+                var verts = (tier.gridSegments + 1) * (tier.gridSegments + 1);
+
+                var fpsEl = document.getElementById('diag-fps');
+                var msEl = document.getElementById('diag-ms');
+                var tierEl = document.getElementById('diag-tier');
+                var dprEl = document.getElementById('diag-dpr');
+                var vertsEl = document.getElementById('diag-verts');
+
+                if (fpsEl) fpsEl.textContent = Math.round(state.fpsSmoothed) + ' FPS';
+                if (msEl) msEl.textContent = state.frameMsSmoothed.toFixed(1) + ' ms';
+                if (tierEl) tierEl.textContent = tier.label + (state.qualityMode === 'auto' ? ' (Auto)' : '');
+                if (dprEl) dprEl.textContent = state.currentDpr.toFixed(2) + 'x';
+                if (vertsEl) vertsEl.textContent = verts.toLocaleString();
+            }
+
+            function bindUIControls() {
+                var settingsBtn = document.getElementById('settings-toggle-btn');
+                var settingsPanel = document.getElementById('settings-panel');
+                var quickResetBtn = document.getElementById('reset-cam-quick-btn');
+                var panelResetBtn = document.getElementById('reset-cam-btn');
+                var waveSlider = document.getElementById('wave-slider');
+                var waveValue = document.getElementById('wave-value');
+                var sunSlider = document.getElementById('sun-slider');
+                var sunValue = document.getElementById('sun-value');
+                var perfToggle = document.getElementById('perf-toggle');
+                var perfBox = document.getElementById('perf-diagnostics');
+
+                // Settings drawer toggle
+                settingsBtn.addEventListener('click', function () {
+                    var isClosed = settingsPanel.classList.toggle('closed');
+                    settingsBtn.setAttribute('aria-expanded', isClosed ? 'false' : 'true');
+                });
+
+                // Camera reset buttons
+                quickResetBtn.addEventListener('click', resetCameraView);
+                panelResetBtn.addEventListener('click', resetCameraView);
+
+                // Quality selector buttons
+                var qualityBtns = document.querySelectorAll('.seg-btn');
+                for (var i = 0; i < qualityBtns.length; i++) {
+                    qualityBtns[i].addEventListener('click', function (e) {
+                        var selected = e.currentTarget.getAttribute('data-quality');
+                        state.qualityMode = selected;
+                        state.lowFpsAccumSec = 0.0;
+                        state.highFpsAccumSec = 0.0;
+                        state.qualityCooldownSec = 3.0;
+
+                        if (selected === 'auto') {
+                            applyQualityTier(state.activeTierKey, true);
+                        } else {
+                            applyQualityTier(selected, true);
+                        }
+                    });
+                }
+
+                // Wave intensity slider
+                waveSlider.value = String(state.waveIntensity);
+                waveValue.textContent = Math.round(state.waveIntensity * 100) + '%';
+                waveSlider.addEventListener('input', function (e) {
+                    state.waveIntensity = parseFloat(e.target.value);
+                    sharedUniforms.uWaveIntensity.value = state.waveIntensity;
+                    waveValue.textContent = Math.round(state.waveIntensity * 100) + '%';
+                });
+
+                // Sun elevation slider
+                sunSlider.value = String(state.sunElevation);
+                sunValue.textContent = describeSunElevation(state.sunElevation);
+                sunSlider.addEventListener('input', function (e) {
+                    state.sunElevation = parseFloat(e.target.value);
+                    updateSunDirection();
+                    sunValue.textContent = describeSunElevation(state.sunElevation);
+                });
+
+                // Optional diagnostics toggle
+                perfToggle.addEventListener('change', function (e) {
+                    state.showStats = Boolean(e.target.checked);
+                    perfBox.classList.toggle('visible', state.showStats);
+                    if (state.showStats) {
+                        updateDiagnosticsDOM();
+                    }
+                });
+
+                updateQualityUI();
+            }
+
+            /* ============================================================================
+             * 13. MAIN ANIMATION LOOP
+             * ============================================================================ */
+            function animate(timestamp) {
+                if (!state.isRunning) return;
+                state.rafId = requestAnimationFrame(animate);
+
+                if (state.lastFrameTimestamp === 0) {
+                    state.lastFrameTimestamp = timestamp;
+                }
+
+                var dt = (timestamp - state.lastFrameTimestamp) * 0.001;
+                state.lastFrameTimestamp = timestamp;
+
+                // Clamp delta time to prevent jumps if browser throttled frames
+                var safeDt = Math.min(dt, 0.1);
+                var timeSpeed = state.reducedMotion ? 0.45 : 1.0;
+                state.elapsedTime += safeDt * timeSpeed;
+                sharedUniforms.uTime.value = state.elapsedTime;
+
+                // Smooth camera damping
+                var damping = 1.0 - Math.exp(-10.0 * safeDt);
+                updateCameraOrientation(damping);
+
+                // Render single pass
+                renderer.render(scene, camera);
+
+                // Adaptive performance tracking
+                evaluateAdaptivePerformance(dt);
+
+                if (state.showStats) {
+                    state.uiUpdateAccumSec += safeDt;
+                    if (state.uiUpdateAccumSec >= 0.35) {
+                        state.uiUpdateAccumSec = 0.0;
+                        updateDiagnosticsDOM();
+                    }
+                }
+            }
+
+            function startLoop() {
+                if (state.isRunning || state.isContextLost) return;
+                state.isRunning = true;
+                state.lastFrameTimestamp = 0;
+                state.rafId = requestAnimationFrame(animate);
+            }
+
+            function stopLoop() {
+                state.isRunning = false;
+                if (state.rafId !== null) {
+                    cancelAnimationFrame(state.rafId);
+                    state.rafId = null;
+                }
+            }
+
+            /* ============================================================================
+             * 14. BOOTSTRAP ON DOM READY
+             * ============================================================================ */
+            function bootstrap() {
+                detectEnvironment();
+                bindUIControls();
+                if (initScene()) {
+                    bindInteractionEvents();
+                    startLoop();
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bootstrap);
+            } else {
+                bootstrap();
+            }
+        })();
+    </script>
+</body>
+
+</html>

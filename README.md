@@ -5,6 +5,7 @@ A small monorepo for independent web experiments.
 ## Apps
 
 - `site`: React, TypeScript, and Vite lab homepage.
+- `cosmic-timeline-btn`: React, TypeScript, Vite, and Tailwind.
 - `cosmo-music-visualizer`: React, TypeScript, and Vite.
 - `dyson-sphere`: standalone HTML, CSS, and JavaScript.
 - `pelagic`: standalone Pelagic calm ocean simulator.
@@ -17,6 +18,7 @@ Run these from the repository root after `npm install`:
 
 ```sh
 npm run dev:site
+npm run dev:cosmic-timeline-btn
 npm run dev:cosmo-music-visualizer
 npm run dev:dyson-sphere
 npm run dev:pelagic
@@ -41,7 +43,8 @@ npm run deploy
 The combined site is assembled in `deployment/public`. The homepage is at `/`,
 the Dyson Sphere app is at `/dyson-sphere/`, and the music visualizer is at
 `/cosmo-music-visualizer/`. Pelagic is at `/pelagic/`, and Production Panic is
-at `/production-panic/`. The Stars Remain is at `/the-stars-remain/`.
+at `/production-panic/`. The Stars Remain is at `/the-stars-remain/`, and the Cosmic Timeline is at
+`/cosmic-timeline-btn/`.
 `wrangler.jsonc` points Cloudflare Wrangler at that assembled directory.
 
 For Cloudflare Workers Builds, set the project root to the repository root,

@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AFTERGLOW — A Walk Beyond Earth</title>
+<style>
+  :root { --cream: #f6ebe2; --peach: #f4c9a8; --ink: #0b0716; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: var(--ink); color: var(--cream);
+    font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; user-select: none;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+
+  /* Soft cinematic vignette (pure CSS, costs nothing on the GPU side). */
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 46%, rgba(0,0,0,0) 56%, rgba(9,4,20,.46) 100%);
+  }
+
+  /* ---------- Introduction screen ---------- */
+  #intro {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    padding: 0 6vw; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 52%, rgba(14,7,28,.50) 0%, rgba(11,6,24,.30) 45%, rgba(9,4,20,.74) 100%);
+    transition: opacity 1.8s ease, visibility 0s linear 1.8s;
+  }
+  #intro.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  #intro .center { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #intro .center > *, #intro .controls { opacity: 0; animation: rise 1.6s cubic-bezier(.2,.7,.2,1) forwards; }
+  #intro h1      { animation-delay: .15s; }
+  #intro .sub    { animation-delay: .55s; }
+  #intro .rule   { animation-delay: .85s; }
+  #intro .tag    { animation-delay: 1.05s; }
+  #intro button  { animation-delay: 1.45s; }
+  #intro .controls { animation-delay: 1.9s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  #intro h1 {
+    margin: 0; padding-left: .42em;
+    font-weight: 200; font-size: clamp(2.3rem, 7.4vw, 6.2rem); letter-spacing: .42em; line-height: 1;
+    text-shadow: 0 0 46px rgba(255,168,118,.38), 0 2px 18px rgba(10,4,22,.6);
+  }
+  #intro .sub {
+    margin: 1.5em 0 0; padding-left: .62em;
+    font-size: clamp(.68rem, 1.2vw, .98rem); letter-spacing: .62em; color: var(--peach); font-weight: 400;
+  }
+  #intro .rule { width: 84px; height: 1px; margin: 2.1em auto; background: linear-gradient(90deg, transparent, var(--peach), transparent); }
+  #intro .tag {
+    margin: 0; font-family: Georgia, "Times New Roman", serif; font-style: italic;
+    font-size: clamp(.95rem, 1.5vw, 1.22rem); color: rgba(246,235,226,.86);
+    text-shadow: 0 1px 12px rgba(10,4,22,.7);
+  }
+  #start {
+    margin-top: 3.1em; padding: 1.05em 2.9em; border-radius: 999px; cursor: pointer;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(244,201,168,.6); color: var(--cream);
+    font: inherit; font-size: .78rem; letter-spacing: .36em; text-transform: uppercase; padding-left: 3.26em;
+    transition: background .4s, box-shadow .4s, border-color .4s, transform .4s;
+  }
+  #start:hover:not(:disabled), #start:focus-visible {
+    background: rgba(244,201,168,.18); border-color: var(--peach); outline: none;
+    box-shadow: 0 0 38px rgba(255,160,110,.38); transform: translateY(-1px);
+  }
+  #start:disabled { opacity: .5; cursor: default; }
+  #intro .controls {
+    flex: 0 0 auto; margin: 0; padding: 1.2em 0 5.2vh; line-height: 2; pointer-events: none;
+    font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: rgba(246,235,226,.62);
+  }
+  #intro .controls b { font-weight: 600; color: rgba(246,235,226,.92); }
+  #intro .controls i { font-style: normal; margin: 0 .9em; opacity: .45; }
+
+  @media (max-height: 560px) {            /* short windows: tighten the title block so nothing overlaps */
+    #intro h1 { font-size: clamp(1.8rem, 11vh, 3.4rem); }
+    #intro .sub { margin-top: 1em; }
+    #intro .rule { margin: 1.1em auto; }
+    #start { margin-top: 1.5em; padding-top: .8em; padding-bottom: .8em; }
+    #intro .controls { padding-bottom: 2.5vh; }
+  }
+
+  /* ---------- In-world hint (only when the mouse is not captured) ---------- */
+  #hint {
+    position: fixed; left: 50%; bottom: 4.6vh; transform: translateX(-50%); z-index: 5;
+    font-size: .7rem; letter-spacing: .26em; text-transform: uppercase; white-space: nowrap;
+    color: rgba(246,235,226,.78); text-shadow: 0 1px 10px rgba(0,0,0,.7);
+    opacity: 0; transition: opacity .9s ease; pointer-events: none;
+  }
+  #hint.show { opacity: 1; }
+
+  #fatal {
+    position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
+    padding: 8vw; text-align: center; background: var(--ink); color: var(--cream); line-height: 1.7; letter-spacing: .04em;
+  }
+</style>
+
+<!-- Three.js r160, pinned, loaded as ES modules straight from the CDN (no build step). -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="scene" tabindex="0"></canvas>
+<div id="vignette"></div>
+
+<div id="intro">
+  <div class="center">
+    <h1>AFTERGLOW</h1>
+    <p class="sub">A WALK BEYOND EARTH</p>
+    <div class="rule"></div>
+    <p class="tag">A peaceful journey beyond the familiar.</p>
+    <button id="start" disabled>Preparing the sky…</button>
+  </div>
+  <p class="controls"><b>W</b> / <b>↑</b> walk forward<i>·</i><b>S</b> / <b>↓</b> walk back<i>·</i><b>Mouse</b> look around<i>·</i><b>Esc</b> release mouse</p>
+</div>
+
+<div id="hint"></div>
+<div id="fatal"></div>
+
+<script>
+  // If the module below never starts (offline CDN, file:// restrictions…), say so instead of hanging.
+  window.__afterglowBooted = false;
+  setTimeout(function () {
+    if (window.__afterglowBooted) return;
+    var f = document.getElementById('fatal');
+    f.style.display = 'flex';
+    f.textContent = 'AFTERGLOW could not load Three.js. Check your internet connection and open this page through a local web server (python -m http.server 8000).';
+  }, 12000);
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+window.__afterglowBooted = true;
+document.getElementById('fatal').style.display = 'none';
+
+/* =====================================================================================
+   1. CONFIGURATION AND VISUAL CONSTANTS
+   Everything worth tweaking lives here. Angles are in degrees, distances in metres.
+   Azimuth 0 = straight down the path, positive = to the right.
+   ===================================================================================== */
+const CONFIG = {
+  // ---- Renderer / post-processing ----
+  MAX_PIXEL_RATIO: 1.5,          // caps resolution on high-DPI screens
+  MSAA_SAMPLES: 4,
+  EXPOSURE: 1.0,                 // overall brightness (ACES filmic tone mapping)
+  BLOOM_STRENGTH: 0.26,          // restrained on purpose
+  BLOOM_RADIUS: 0.62,
+  BLOOM_THRESHOLD: 0.92,         // only the sun, flowers and brightest stars pass
+  FOV: 62, NEAR: 0.25, FAR: 60000,
+
+  // ---- Sun and ambient light ----
+  SUN_AZIMUTH: -42,
+  SUN_ELEVATION: 3.6,            // where the sun disc sits in the sky
+  SUN_LIGHT_ELEVATION: 17,       // slightly lifted direction used for shading (keeps the foreground readable)
+  SUN_COLOR: '#ffb27a', SUN_INTENSITY: 2.3,
+  SUN_DISC_COLOR: '#ffb060', SUN_DISC_INTENSITY: 5.0, SUN_DISC_RADIUS: 0.8,
+  AMBIENT_SKY: '#8478b8', AMBIENT_SKY_INTENSITY: 0.95,       // purple fill from above
+  AMBIENT_GROUND: '#a0626a', AMBIENT_GROUND_INTENSITY: 0.42, // warm bounce from below
+
+  // ---- Sky gradient (horizon -> zenith) ----
+  SKY_HORIZON_SUN: '#ffa462', SKY_HORIZON_SUN_GAIN: 1.0,   // orange / peach beside the sun
+  SKY_HORIZON_FAR: '#c8848a', SKY_HORIZON_FAR_GAIN: 0.85,    // dusty rose away from it
+  SKY_MID_SUN: '#d24a7e', SKY_MID_FAR: '#7c3f88',           // pink / magenta band
+  SKY_UPPER: '#33206a',                                     // violet
+  SKY_ZENITH: '#0e0a28',                                    // deep indigo, lets the stars show
+  SUN_GLOW: '#ff9448', SUN_GLOW_GAIN: 1.0,
+
+  // ---- Atmospheric fog ----
+  FOG_DENSITY: 0.00052,
+  FOG_HEIGHT_FALLOFF: 0.0013,    // fog thins with altitude: mountain bases dissolve, peaks stay
+  FOG_MAX: 0.96,
+  FOG_TINT: '#6a4f80', FOG_SKY_MIX: 0.5,
+
+  // ---- Clouds / stars / particles ----
+  CLOUD_COVERAGE: 0.47, CLOUD_SOFTNESS: 0.18, CLOUD_OPACITY: 0.9, CLOUD_OVER_PLANET: 0.22,
+  CLOUD_DARK: '#3d2b5a', CLOUD_LIT_FAR: '#e8809c', CLOUD_LIT_SUN: '#ffb268',
+  CLOUD_DRIFT: 0.0035,
+  STAR_COUNT: 2400, STAR_BRIGHTNESS: 1.15,
+  MOTE_COUNT: 380,
+
+  // ---- The ringed planet ----
+  PLANET_AZIMUTH: 11, PLANET_ELEVATION: 26.5,
+  PLANET_ANGULAR_RADIUS: 11.5,   // half of its apparent diameter
+  PLANET_DISTANCE: 16000,        // far behind the mountains (max ~4 km) so depth occlusion is coherent
+  PLANET_TEXTURE_WIDTH: 2048,
+  PLANET_LIGHT: { x: -0.82, y: 0.0, z: 0.52 },     // in view space of the planet: left / down / towards viewer
+  PLANET_LIGHT_COLOR: '#ffe2c4', PLANET_LIGHT_INTENSITY: 1.18,
+  PLANET_AMBIENT: '#4a3a78', PLANET_AMBIENT_INTENSITY: 0.34,
+  PLANET_ATMOSPHERE: '#ffb9a0', PLANET_ATMOSPHERE_INTENSITY: 0.36,
+  PLANET_HAZE: 0.34,             // how much of the sky colour veils the planet (aerial perspective)
+  RING_INNER: 1.30, RING_OUTER: 2.32,              // in planet radii
+  RING_OPENING: -19,             // tilt of the ring plane towards the viewer (negative: seen from beneath)
+  RING_ROLL: 21,                 // lean of the spin axis on screen
+  RING_OPACITY: 0.92, RING_BRIGHTNESS: 1.05, RING_SHADOW_ON_PLANET: 0.6,
+  PLANET_ROTATION_PER_METRE: 0.018,   // radians of spin per metre walked (the signature mechanic)
+  PLANET_SPIN_DIRECTION: 1,           // 1: walking forward turns the planet clockwise as the player sees it; -1 flips it
+  PLANET_INITIAL_SPIN: 4.05,
+
+  // ---- Player ----
+  WALK_SPEED: 3.0, ACCELERATION: 5.0, DECELERATION: 9.0,
+  EYE_HEIGHT: 1.72,
+  MOUSE_SENSITIVITY: 0.0021, LOOK_SMOOTHING: 18, MAX_PITCH: 80,
+  START_PITCH: 8,
+  BOB_HEIGHT: 0.03, BOB_SWAY: 0.016, STRIDE_LENGTH: 1.55,
+
+  // ---- Terrain and path ----
+  PATH_HALF_WIDTH: 1.25,
+  GROUND_HALF_SIZE: 640, GROUND_CELL: 4,
+  BIOME_SIZE: 360,               // metres covered by one tile of the vegetation map
+  SOIL_DARK: '#2c2430', SOIL_LIGHT: '#55444e',
+  PATH_COLOR_A: '#57443c', PATH_COLOR_B: '#86705f', PEBBLE_COLOR: '#a49088',
+
+  // ---- Performance safety net ----
+  ADAPTIVE_QUALITY: true,        // if the frame rate stays low, quietly lower resolution, then grass density
+  ADAPTIVE_MIN_FPS: 38,
+
+  // ---- Vegetation ----
+  GRASS_NEAR_COUNT: 28000,       // fine tufts close to the trail
+  GRASS_FAR_COUNT: 46000,        // broader clumps out to the middle distance
+  PLUME_COUNT: 1500,             // taller alien plume plants
+  FLOWER_COUNT: 900,             // bioluminescent flowers (placed in loose colonies)
+  GRASS_GREEN: '#5c9468', GRASS_TEAL: '#3a9490', GRASS_PURPLE: '#5e4f8c', GRASS_VIOLET: '#8566a6',
+  GRASS_DRY: '#9a8a6c',
+  PLUME_A: '#84507c', PLUME_B: '#a86c90', PLUME_C: '#6e4c90', PLUME_D: '#9470aa',
+  GLOW_A: '#58f2e2', GLOW_B: '#ff7ad6', GLOW_INTENSITY: 2.6,
+  WIND_STRENGTH: 0.16, WIND_DIRECTION: 28,
+
+  // ---- Boulders ----
+  BOULDER_COUNT: 1150,
+  ROCK_DARK: '#342c3c', ROCK_LIGHT: '#7a6a72',
+
+  SEED: 20261110
+};
+const C = CONFIG;
+
+const DEG = Math.PI / 180, TAU = Math.PI * 2;
+const UP = new THREE.Vector3(0, 1, 0);
+const PATH_DIRECTION = new THREE.Vector3(0, 0, -1);   // the trail never bends: walking is always along this vector
+const lin = (hex, gain = 1) => new THREE.Color(hex).multiplyScalar(gain);     // sRGB hex -> linear working colour
+const dirFromAzEl = (az, el) => new THREE.Vector3(
+  Math.sin(az * DEG) * Math.cos(el * DEG), Math.sin(el * DEG), -Math.cos(az * DEG) * Math.cos(el * DEG));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+
+/* ---- Deterministic random + value noise used by all procedural generators ---- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(C.SEED);
+const PERM = new Uint8Array(512), RV = new Float32Array(256);
+{
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const t = p[i]; p[i] = p[j]; p[j] = t; }
+  for (let i = 0; i < 512; i++) PERM[i] = p[i & 255];
+  for (let i = 0; i < 256; i++) RV[i] = rand();
+}
+function noise2(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const X = xi & 255, Y = yi & 255;
+  const a = RV[PERM[PERM[X] + Y]], b = RV[PERM[PERM[X + 1] + Y]];
+  const c = RV[PERM[PERM[X] + Y + 1]], d = RV[PERM[PERM[X + 1] + Y + 1]];
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function noise2p(x, y, period) {            // tileable variant (period in lattice cells)
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const X0 = ((xi % period) + period) % period, X1 = (X0 + 1) % period;
+  const Y0 = ((yi % period) + period) % period, Y1 = (Y0 + 1) % period;
+  const a = RV[PERM[PERM[X0] + Y0]], b = RV[PERM[PERM[X1] + Y0]];
+  const c = RV[PERM[PERM[X0] + Y1]], d = RV[PERM[PERM[X1] + Y1]];
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function noise3(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const X = xi & 255, Y = yi & 255, Z = zi & 255;
+  const A = PERM[X] + Y, B = PERM[X + 1] + Y;
+  const AA = PERM[A] + Z, AB = PERM[A + 1] + Z, BA = PERM[B] + Z, BB = PERM[B + 1] + Z;
+  const c000 = RV[PERM[AA]], c100 = RV[PERM[BA]], c010 = RV[PERM[AB]], c110 = RV[PERM[BB]];
+  const c001 = RV[PERM[AA + 1]], c101 = RV[PERM[BA + 1]], c011 = RV[PERM[AB + 1]], c111 = RV[PERM[BB + 1]];
+  const x00 = c000 + (c100 - c000) * u, x10 = c010 + (c110 - c010) * u;
+  const x01 = c001 + (c101 - c001) * u, x11 = c011 + (c111 - c011) * u;
+  const y0 = x00 + (x10 - x00) * v, y1 = x01 + (x11 - x01) * v;
+  return y0 + (y1 - y0) * w;
+}
+function fbm2(x, y, oct) { let a = 0.5, s = 0, n = 0; for (let i = 0; i < oct; i++) { s += a * noise2(x, y); n += a; x = x * 2.03 + 17.3; y = y * 2.03 + 9.1; a *= 0.5; } return s / n; }
+function fbm2p(x, y, period, oct) { let a = 0.5, s = 0, n = 0, f = 1; for (let i = 0; i < oct; i++) { s += a * noise2p(x * f + i * 13, y * f + i * 7, period * f); n += a; f *= 2; a *= 0.5; } return s / n; }
+function fbm3(x, y, z, oct) { let a = 0.5, s = 0, n = 0; for (let i = 0; i < oct; i++) { s += a * noise3(x, y, z); n += a; x = x * 2.02 + 5.1; y = y * 2.02 + 1.7; z = z * 2.02 + 8.3; a *= 0.5; } return s / n; }
+function ridged2(x, y, oct) { let a = 0.5, s = 0, n = 0; for (let i = 0; i < oct; i++) { let v = 1 - Math.abs(noise2(x, y) * 2 - 1); v *= v; s += a * v; n += a; x = x * 2.07 + 3.3; y = y * 2.07 + 7.9; a *= 0.5; } return s / n; }
+
+/* The trail's gentle rise and fall. Must match pathBase() in the GLSL below. */
+const pathBaseHeight = z => 0.9 * Math.sin(z * 0.0113) + 0.45 * Math.sin(z * 0.0291 + 1.7);
+
+/* =====================================================================================
+   2. RENDERER AND SCENE INITIALISATION
+   ===================================================================================== */
+const canvas = document.getElementById('scene');
+const introEl = document.getElementById('intro');
+const startBtn = document.getElementById('start');
+const hintEl = document.getElementById('hint');
+
+function fatal(message) {
+  const f = document.getElementById('fatal');
+  f.style.display = 'flex'; f.textContent = message;
+}
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+} catch (e) {
+  fatal('AFTERGLOW needs WebGL 2, which this browser or device could not provide.');
+  throw e;
+}
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = C.EXPOSURE;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000);      // never actually seen: the sky dome covers every pixel
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(C.FOV, 1, C.NEAR, C.FAR);
+camera.rotation.order = 'YXZ';
+
+// HDR render target with MSAA -> restrained bloom -> tone mapping + sRGB output.
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, {
+  type: THREE.HalfFloatType, samples: C.MSAA_SAMPLES
+}));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(4, 4), C.BLOOM_STRENGTH, C.BLOOM_RADIUS, C.BLOOM_THRESHOLD);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+/* ---- Directions shared by the whole world ---- */
+const SUN_DIR = dirFromAzEl(C.SUN_AZIMUTH, C.SUN_ELEVATION);
+const SUN_LIGHT_DIR = dirFromAzEl(C.SUN_AZIMUTH, C.SUN_LIGHT_ELEVATION);
+const PLANET_DIR = dirFromAzEl(C.PLANET_AZIMUTH, C.PLANET_ELEVATION);   // fixed celestial direction
+const PLANET_RADIUS = C.PLANET_DISTANCE * Math.tan(C.PLANET_ANGULAR_RADIUS * DEG);
+
+/* ---- Vegetation map: a tileable texture (R = grass density, G = colour zone, B = dryness).
+        The ground shader and every plant sample the same map, so clusters and soil patches agree. ---- */
+function generateBiomeTexture() {
+  const N = 512, data = new Uint8Array(N * N * 4);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const fx = x / N, fy = y / N;
+    const broad = fbm2p(fx * 7, fy * 7, 7, 3);                       // meadows ~50 m across
+    const mid = fbm2p(fx * 26 + 3.3, fy * 26 + 1.1, 26, 3);         // clusters ~14 m across
+    const fine = noise2p(fx * 90, fy * 90, 90);
+    const dens = clamp(0.42 * sstep(0.28, 0.64, broad) + 0.46 * sstep(0.34, 0.62, mid) + (fine - 0.5) * 0.3 + 0.24, 0, 1);
+    const hue = sstep(0.30, 0.78, fbm2p(fx * 9 + 9.7, fy * 9 + 2.2, 9, 3));   // green/teal vs purple/violet zones
+    const dry = sstep(0.45, 0.8, fbm2p(fx * 9 + 5.5, fy * 9 + 8.8, 9, 3));
+    const i = (y * N + x) * 4;
+    data[i] = dens * 255; data[i + 1] = hue * 255; data[i + 2] = dry * 255; data[i + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true; tex.needsUpdate = true;
+  return tex;
+}
+
+/* ---- Uniforms shared by every material (same objects, so one update reaches all shaders) ---- */
+const U = {
+  uTime: { value: 0 },
+  uSunDir: { value: SUN_DIR }, uSunLightDir: { value: SUN_LIGHT_DIR },
+  uSunColor: { value: lin(C.SUN_COLOR, C.SUN_INTENSITY) },
+  uAmbSky: { value: lin(C.AMBIENT_SKY, C.AMBIENT_SKY_INTENSITY) },
+  uAmbGround: { value: lin(C.AMBIENT_GROUND, C.AMBIENT_GROUND_INTENSITY) },
+  uSkyZenith: { value: lin(C.SKY_ZENITH) }, uSkyUpper: { value: lin(C.SKY_UPPER) },
+  uSkyMidSun: { value: lin(C.SKY_MID_SUN) }, uSkyMidFar: { value: lin(C.SKY_MID_FAR) },
+  uSkyHorSun: { value: lin(C.SKY_HORIZON_SUN, C.SKY_HORIZON_SUN_GAIN) },
+  uSkyHorFar: { value: lin(C.SKY_HORIZON_FAR, C.SKY_HORIZON_FAR_GAIN) },
+  uSunGlow: { value: lin(C.SUN_GLOW, C.SUN_GLOW_GAIN) },
+  uFogTint: { value: lin(C.FOG_TINT) },
+  uFogParams: { value: new THREE.Vector4(C.FOG_DENSITY, C.FOG_HEIGHT_FALLOFF, C.FOG_MAX, C.FOG_SKY_MIX) },
+  uBiome: { value: null },
+  uWindDir: { value: new THREE.Vector2(Math.sin(C.WIND_DIRECTION * DEG), -Math.cos(C.WIND_DIRECTION * DEG)) },
+  uPixelRatio: { value: 1 }, uPxScale: { value: 1000 }
+};
+
+/* ---- GLSL shared by all shaders: noise, terrain shape, sky colour, fog, ambient light ---- */
+const GLSL_COMMON = /* glsl */`
+#define BIOME_SIZE ${C.BIOME_SIZE.toFixed(1)}
+#define PATH_HALF ${C.PATH_HALF_WIDTH.toFixed(3)}
+uniform float uTime;
+uniform vec3 uSunDir, uSunLightDir, uSunColor, uAmbSky, uAmbGround;
+uniform vec3 uSkyZenith, uSkyUpper, uSkyMidSun, uSkyMidFar, uSkyHorSun, uSkyHorFar, uSunGlow;
+uniform vec3 uFogTint;
+uniform vec4 uFogParams;
+uniform sampler2D uBiome;
+uniform vec2 uWindDir;
+uniform float uPixelRatio, uPxScale;
+
+float hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * .1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
+             mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float a = 0.5, s = 0.0;
+  for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.03 + vec2(17.3, 9.1); a *= 0.5; }
+  return s / 0.9375;
+}
+
+/* Terrain: flat along the trail corridor, gently rolling grassland either side. */
+float pathBase(float z) { return 0.9 * sin(z * 0.0113) + 0.45 * sin(z * 0.0291 + 1.7); }
+float terrainHeight(vec2 p) {
+  float m = smoothstep(2.0, 18.0, abs(p.x));
+  float roll = 1.9 * sin(p.x * 0.031 + 0.6) * cos(p.y * 0.027 + 1.1)
+             + 1.1 * sin(p.x * 0.058 - p.y * 0.043 + 2.3)
+             + 0.4 * sin(p.x * 0.11 + p.y * 0.09 + 0.4);
+  return pathBase(p.y) + m * roll;
+}
+
+/* Sunset sky: warm horizon -> pink/magenta -> violet -> deep indigo, warmer and brighter towards the sun. */
+vec3 skyCore(vec3 d) {
+  float h = max(d.y, 0.0);
+  vec2 sh = normalize(uSunDir.xz);
+  vec2 dh = d.xz / max(length(d.xz), 1e-4);
+  float az = clamp(dot(sh, dh) * 0.5 + 0.5, 0.0, 1.0);   // clamped: pow() of a tiny negative is NaN on real GPUs
+  vec3 hor = mix(uSkyHorFar, uSkyHorSun, pow(az, 1.6));
+  vec3 mid = mix(uSkyMidFar, uSkyMidSun, az * az);
+  vec3 c = mix(hor, mid, smoothstep(0.015, 0.20, h));
+  c = mix(c, uSkyUpper, smoothstep(0.12, 0.44, h));
+  c = mix(c, uSkyZenith, smoothstep(0.36, 0.90, h));
+  float sd = clamp(dot(d, uSunDir), 0.0, 1.0);
+  c += uSunGlow * (pow(sd, 10.0) * 0.20 + pow(sd, 90.0) * 0.50);
+  return c;
+}
+vec3 fogColor(vec3 d) {
+  vec3 level = normalize(vec3(d.x, 0.055, d.z));
+  return mix(uFogTint, skyCore(level), uFogParams.w);
+}
+vec3 skyFull(vec3 d) {            // the sky melts into the haze right at the horizon
+  return mix(fogColor(d), skyCore(d), smoothstep(-0.004, 0.045, d.y));
+}
+vec3 applyFog(vec3 col, vec3 wp) {
+  vec3 v = wp - cameraPosition;
+  float dist = length(v);
+  float f = 1.0 - exp(-dist * uFogParams.x);
+  f *= exp(-max(wp.y - 12.0, 0.0) * uFogParams.y);
+  return max(mix(col, fogColor(v / max(dist, 1e-3)), clamp(f, 0.0, 1.0) * uFogParams.z), 0.0);
+}
+vec3 hemiLight(vec3 n) { return mix(uAmbGround, uAmbSky, n.y * 0.5 + 0.5); }
+`;
+
+function makeMaterial({ vertexShader, fragmentShader, uniforms = {}, ...rest }) {
+  return new THREE.ShaderMaterial({
+    uniforms: { ...U, ...uniforms },
+    vertexShader: GLSL_COMMON + vertexShader,
+    fragmentShader: GLSL_COMMON + fragmentShader,
+    ...rest
+  });
+}
+
+/* =====================================================================================
+   3. SKY AND ATMOSPHERIC ENVIRONMENT  (gradient dome, sun, stars, sunset clouds)
+   ===================================================================================== */
+let skyDome, starField, cloudDome;
+
+function buildSky() {
+  // --- Gradient dome with the sun disc. Drawn first, ignores depth, follows the camera. ---
+  skyDome = new THREE.Mesh(new THREE.SphereGeometry(100, 48, 24), makeMaterial({
+    uniforms: {
+      uSunDiscColor: { value: lin(C.SUN_DISC_COLOR, C.SUN_DISC_INTENSITY) },
+      uSunDisc: { value: new THREE.Vector2(Math.cos(C.SUN_DISC_RADIUS * 1.25 * DEG), Math.cos(C.SUN_DISC_RADIUS * 0.8 * DEG)) }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vDir;
+      void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uSunDiscColor; uniform vec2 uSunDisc;
+      varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        vec3 c = skyFull(d);
+        float disc = smoothstep(uSunDisc.x, uSunDisc.y, dot(d, uSunDir));
+        c += uSunDiscColor * disc * smoothstep(-0.01, 0.035, d.y);
+        c += (hash12(gl_FragCoord.xy) - 0.5) * 0.006;        // dither against gradient banding
+        gl_FragColor = vec4(max(c, 0.0), 1.0);
+      }`,
+    side: THREE.BackSide, depthTest: false, depthWrite: false
+  }));
+  skyDome.renderOrder = -100; skyDome.frustumCulled = false;
+  scene.add(skyDome);
+
+  // --- Stars: only visible where the sky is dark, each one twinkling slightly. ---
+  const n = C.STAR_COUNT, pos = new Float32Array(n * 3), star = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const y = -0.02 + 1.02 * rand(), a = rand() * TAU, r = Math.sqrt(Math.max(0, 1 - y * y));
+    pos[i * 3] = Math.cos(a) * r * 30000; pos[i * 3 + 1] = y * 30000; pos[i * 3 + 2] = Math.sin(a) * r * 30000;
+    const mag = Math.pow(rand(), 3.2);
+    star[i * 3] = 1.3 + mag * 2.1;            // size in px
+    star[i * 3 + 1] = rand();                 // twinkle phase / colour seed
+    star[i * 3 + 2] = 0.22 + mag * 0.95;      // brightness
+  }
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  sg.setAttribute('aStar', new THREE.BufferAttribute(star, 3));
+  starField = new THREE.Points(sg, makeMaterial({
+    uniforms: { uStarGain: { value: C.STAR_BRIGHTNESS } },
+    vertexShader: /* glsl */`
+      attribute vec3 aStar; uniform float uStarGain;
+      varying vec3 vCol;
+      void main() {
+        vec3 d = normalize(position);
+        float vis = smoothstep(0.16, 0.58, d.y);                                  // fade into the bright horizon
+        vis *= 1.0 - 0.75 * smoothstep(0.35, 1.0, dot(d, uSunDir) * 0.5 + 0.5);   // and near the sun
+        float tw = 0.78 + 0.22 * sin(uTime * (0.9 + aStar.y * 2.4) + aStar.y * 57.0);
+        vec3 tint = mix(vec3(1.0, 0.86, 0.78), vec3(0.78, 0.86, 1.0), fract(aStar.y * 7.13));
+        vCol = tint * aStar.z * vis * tw * uStarGain;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aStar.x * uPixelRatio;
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec3 vCol;
+      void main() {
+        float r = length(gl_PointCoord - 0.5);
+        float a = 1.0 - smoothstep(0.08, 0.5, r);
+        gl_FragColor = vec4(vCol, a);
+      }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  starField.renderOrder = 1; starField.frustumCulled = false;
+  scene.add(starField);
+
+  // --- Sunset clouds: a transparent dome between the mountains and the planet, so the
+  //     occasional wisp really does pass in front of the gas giant. ---
+  cloudDome = new THREE.Mesh(new THREE.SphereGeometry(6000, 48, 24), makeMaterial({
+    uniforms: {
+      uCloud: { value: new THREE.Vector4(C.CLOUD_COVERAGE, C.CLOUD_SOFTNESS, C.CLOUD_OPACITY, C.CLOUD_OVER_PLANET) },
+      uCloudDark: { value: lin(C.CLOUD_DARK) }, uCloudLitFar: { value: lin(C.CLOUD_LIT_FAR) },
+      uCloudLitSun: { value: lin(C.CLOUD_LIT_SUN, 1.2) },
+      uCloudDrift: { value: C.CLOUD_DRIFT },
+      uPlanetDir: { value: PLANET_DIR },
+      uPlanetMask: { value: new THREE.Vector2(Math.cos(C.PLANET_ANGULAR_RADIUS * 1.5 * DEG), Math.cos(C.PLANET_ANGULAR_RADIUS * 0.95 * DEG)) }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vDir;
+      void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */`
+      uniform vec4 uCloud; uniform vec3 uCloudDark, uCloudLitFar, uCloudLitSun, uPlanetDir;
+      uniform vec2 uPlanetMask; uniform float uCloudDrift;
+      varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        float h = d.y;
+        if (h <= 0.012) discard;
+        vec2 uv = d.xz / (h + 0.10);                           // project onto a high flat layer
+        uv = vec2(0.819 * uv.x - 0.574 * uv.y, 0.574 * uv.x + 0.819 * uv.y);
+        vec2 q = uv * vec2(0.16, 0.60) + vec2(uTime * uCloudDrift, 0.0);   // stretched into long streaks
+        float warp = fbm(q * 1.7 + 4.0);
+        float n = fbm(q + vec2(warp * 0.9, warp * 0.35));
+        float fine = fbm(q * 4.3 + 11.0);
+        float dens = smoothstep(uCloud.x, uCloud.x + uCloud.y, n * 0.64 + fine * 0.36);
+        dens *= smoothstep(0.012, 0.075, h) * (1.0 - smoothstep(0.48, 0.85, h));
+        if (dens < 0.004) discard;
+        float sd = clamp(dot(d, uSunDir), 0.0, 1.0);
+        float sunSide = pow(sd, 1.5);
+        float low = 1.0 - smoothstep(0.03, 0.45, h);
+        vec3 lit = mix(uCloudLitFar, uCloudLitSun, sunSide);
+        float thin = 1.0 - dens;
+        float litAmt = clamp(0.04 + 0.30 * low + 0.60 * sunSide + 0.62 * thin * thin - 0.25 * fine, 0.0, 1.0);
+        vec3 col = mix(uCloudDark, lit, litAmt);
+        col = mix(col, skyCore(d), 0.30 * (1.0 - smoothstep(0.02, 0.16, h)));
+        float a = dens * uCloud.z;
+        a *= mix(1.0, uCloud.w, smoothstep(uPlanetMask.x, uPlanetMask.y, dot(d, uPlanetDir)));
+        gl_FragColor = vec4(col, a);
+      }`,
+    side: THREE.BackSide, transparent: true, depthWrite: false
+  }));
+  cloudDome.renderOrder = 3; cloudDome.frustumCulled = false;
+  scene.add(cloudDome);
+}
+
+/* =====================================================================================
+   4. DISTANT MOUNTAINS  (one polar mesh: far plains rising into three layered ranges)
+   ===================================================================================== */
+let farTerrain;
+
+function buildMountains() {
+  const A = 640, R = 76, rIn = 470, rOut = 4300;
+  const gaussAng = (th, c, w) => { let d = th - c; d -= TAU * Math.round(d / TAU); return Math.exp(-(d * d) / (w * w)); };
+  const sunAz = C.SUN_AZIMUTH * DEG;
+  const height = (x, z, r, th) => {
+    const g = (c, w) => Math.exp(-((r - c) / w) * ((r - c) / w));
+    // Lower passes straight ahead (the trail leads into one) and where the sun sets.
+    const pass = 1 - 0.55 * gaussAng(th, 0, 0.27) - 0.6 * gaussAng(th, sunAz, 0.2);
+    const big = noise2(x * 0.00037 + 11.3, z * 0.00037 + 5.7);
+    const rid = ridged2(x * 0.0012 + 3.1, z * 0.0012 + 7.7, 5);
+    const plains = -6 + 5 * (noise2(x * 0.004, z * 0.004) - 0.5) * sstep(520, 900, r);
+    const ranges = g(1500, 300) * 175 + g(2500, 420) * 390 + g(3600, 520) * 660;
+    return plains + ranges * (0.2 + 0.8 * rid) * (0.58 + 0.52 * big) * pass;
+  };
+  const pos = new Float32Array((A + 1) * (R + 1) * 3), idx = [];
+  for (let j = 0; j <= R; j++) {
+    const r = rIn + (rOut - rIn) * Math.pow(j / R, 1.15);
+    for (let i = 0; i <= A; i++) {
+      const th = -Math.PI + (i / A) * TAU;            // seam sits behind the player
+      const x = Math.sin(th) * r, z = -Math.cos(th) * r, k = (j * (A + 1) + i) * 3;
+      pos[k] = x; pos[k + 1] = height(x, z, r, th); pos[k + 2] = z;
+    }
+  }
+  for (let j = 0; j < R; j++) for (let i = 0; i < A; i++) {
+    const a = j * (A + 1) + i, b = a + (A + 1), c = a + 1, d = b + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+
+  farTerrain = new THREE.Mesh(geo, makeMaterial({
+    uniforms: {
+      uRockDark: { value: lin('#33263a') }, uRockWarm: { value: lin('#6e4a4c') },
+      uVegA: { value: lin(C.GRASS_TEAL, 0.5) }, uVegB: { value: lin(C.GRASS_PURPLE, 0.55) },
+      uSoil: { value: lin(C.SOIL_LIGHT) }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vWorld, vLocal, vN;
+      void main() {
+        vLocal = position; vN = normal;
+        vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uRockDark, uRockWarm, uVegA, uVegB, uSoil;
+      varying vec3 vWorld, vLocal, vN;
+      void main() {
+        vec3 N = normalize(vN);
+        float slope = 1.0 - N.y;
+        float n = fbm(vLocal.xz * 0.012);
+        vec3 rock = mix(uRockDark, uRockWarm, n) * (0.8 + 0.4 * vnoise(vLocal.xz * 0.05 + vLocal.y * 0.03));
+        vec3 veg = mix(uVegA, uVegB, smoothstep(0.35, 0.65, fbm(vLocal.xz * 0.0035 + 7.0)));
+        veg = mix(veg, uSoil, 0.35 * n);
+        float vegAmt = (1.0 - smoothstep(0.10, 0.34, slope)) * (1.0 - smoothstep(70.0, 300.0, vLocal.y));
+        vec3 alb = mix(rock, veg, vegAmt);
+        float ndl = max(dot(N, uSunLightDir), 0.0);
+        vec3 col = alb * (hemiLight(N) + uSunColor * ndl);
+        gl_FragColor = vec4(applyFog(col, vWorld), 1.0);
+      }`
+  }));
+  farTerrain.frustumCulled = false;
+  scene.add(farTerrain);
+}
+
+/* =====================================================================================
+   5. PROCEDURAL PLANET TEXTURE  (CanvasTexture: banded gas giant with storms; data strip for the rings)
+   ===================================================================================== */
+function generatePlanetTexture(W) {
+  const H = W / 2;
+  const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+  const ctx = cvs.getContext('2d');
+  const img = ctx.createImageData(W, H), px = img.data;
+
+  // Latitude colour ramp, south pole -> north pole: copper, muted orange, peach, cream, lavender, dark violet.
+  const stops = [
+    [0.00, 70, 54, 92], [0.06, 104, 84, 128], [0.11, 150, 128, 172], [0.155, 112, 86, 132],
+    [0.20, 214, 160, 122], [0.245, 176, 100, 62], [0.285, 150, 82, 58], [0.325, 206, 132, 82],
+    [0.37, 236, 208, 172], [0.405, 222, 164, 122], [0.445, 122, 78, 104], [0.47, 96, 66, 98],
+    [0.50, 190, 116, 72], [0.535, 232, 190, 146], [0.565, 240, 218, 186], [0.60, 220, 152, 100],
+    [0.64, 168, 94, 62], [0.675, 138, 102, 142], [0.705, 176, 152, 198], [0.74, 226, 196, 168],
+    [0.775, 232, 178, 132], [0.81, 196, 122, 80], [0.85, 126, 96, 144], [0.89, 152, 132, 178],
+    [0.94, 102, 82, 126], [1.00, 66, 50, 88]
+  ];
+  const LN = 2048, lut = new Float32Array(LN * 3);
+  for (let i = 0, s = 0; i < LN; i++) {
+    const v = i / (LN - 1);
+    while (s < stops.length - 2 && v > stops[s + 1][0]) s++;
+    const a = stops[s], b = stops[s + 1], t = sstep(0.12, 0.88, (v - a[0]) / (b[0] - a[0]));
+    for (let k = 0; k < 3; k++) lut[i * 3 + k] = a[k + 1] + (b[k + 1] - a[k + 1]) * t;
+  }
+
+  // Recognisable oval storms (two large, a scatter of small ones).
+  const storms = [
+    { lon: 3.25, lat: -0.37, a: 0.29, b: 0.12, core: [136, 54, 50], mid: [198, 108, 72], collar: [240, 214, 180], swirl: 1 },
+    { lon: 1.25, lat: 0.50, a: 0.125, b: 0.066, core: [248, 232, 208], mid: [230, 204, 184], collar: [108, 84, 128], swirl: -1 }
+  ];
+  for (let k = 0; k < 18; k++) {
+    const light = rand() > 0.45;
+    storms.push({
+      lon: rand() * TAU, lat: (rand() - 0.5) * 2.0, a: 0.03 + rand() * 0.045, b: 0.017 + rand() * 0.018, small: true,
+      core: light ? [246, 228, 204] : [98, 60, 78], mid: light ? [234, 206, 176] : [128, 80, 86], swirl: 1
+    });
+  }
+
+  const cosLon = new Float32Array(W), sinLon = new Float32Array(W);
+  for (let x = 0; x < W; x++) { const l = (x + 0.5) / W * TAU; cosLon[x] = Math.cos(l); sinLon[x] = Math.sin(l); }
+
+  for (let y = 0; y < H; y++) {
+    const v = 1 - (y + 0.5) / H, lat = (v - 0.5) * Math.PI, cl = Math.cos(lat), sl = Math.sin(lat);
+    const rowStorms = storms.filter(s => Math.abs(lat - s.lat) < s.b * 2.7);
+    for (let x = 0; x < W; x++) {
+      const cx = cosLon[x] * cl, cz = sinLon[x] * cl, lon = (x + 0.5) / W * TAU;
+      // Noise is sampled on the sphere itself, so the texture is seamless and the poles do not pinch.
+      const warp = fbm3(cx * 1.7 + 2.1, sl * 2.4, cz * 1.7 + 7.3, 3) - 0.5;          // broad meanders
+      const zonal = fbm3(cx * 2.6 + 5.2, sl * 26.0, cz * 2.6 + 1.7, 3) - 0.5;        // east-west streaks
+      const turb = noise3(cx * 8.5 + 3.0, sl * 11.0, cz * 8.5 + 8.0) - 0.5;          // band-edge turbulence
+      const asym = 0.45 + 1.1 * noise3(cx * 1.1 + 9.0, sl * 1.3, cz * 1.1 + 4.0);    // some longitudes are wilder
+      const curl = noise3(cx * 19.0 + 1.0, sl * 24.0, cz * 19.0 + 6.0) - 0.5;                 // small eddies
+      let vv = v + warp * 0.028 * asym + turb * 0.021 * asym + curl * 0.007 * asym;
+
+      let sr = 0, sg = 0, sb = 0, sw = 0;
+      for (let k = 0; k < rowStorms.length; k++) {
+        const s = rowStorms[k];
+        let dl = lon - s.lon; dl -= TAU * Math.round(dl / TAU);
+        const dx = dl * cl / s.a, dy = (lat - s.lat) / s.b, dd = dx * dx + dy * dy;
+        if (dd > 7.3) continue;
+        const d = Math.sqrt(dd);
+        vv -= (dy * s.b / Math.PI) * (s.small ? 0.5 : 0.8) * Math.exp(-dd * 0.55);   // bands bend around the oval
+        if (d < 1.4) {
+          const ang = Math.atan2(dy, dx);
+          const spiral = Math.sin(ang * 2 * s.swirl + d * 7.5 + warp * 9);
+          const inner = 1 - sstep(0.2, 1.0, d);
+          const w = (1 - sstep(0.82, 1.12, d)) * (s.small ? 0.8 : 1);
+          const sh = 0.93 + 0.07 * spiral;
+          sr = (s.mid[0] + (s.core[0] - s.mid[0]) * inner) * sh;
+          sg = (s.mid[1] + (s.core[1] - s.mid[1]) * inner) * sh;
+          sb = (s.mid[2] + (s.core[2] - s.mid[2]) * inner) * sh;
+          sw = w;
+          if (s.collar) {                                                             // pale collar around big storms
+            const cw = (1 - sstep(1.12, 1.4, d)) * (1 - w) * 0.5;
+            sr = sr * w + s.collar[0] * cw; sg = sg * w + s.collar[1] * cw; sb = sb * w + s.collar[2] * cw;
+            const tw = w + cw; if (tw > 0) { sr /= tw; sg /= tw; sb /= tw; } sw = tw;
+          }
+        }
+      }
+
+      const li = clamp(vv, 0, 1) * (LN - 1), l0 = li | 0, l1 = Math.min(l0 + 1, LN - 1), lf = li - l0;
+      let r = lut[l0 * 3] + (lut[l1 * 3] - lut[l0 * 3]) * lf;
+      let g = lut[l0 * 3 + 1] + (lut[l1 * 3 + 1] - lut[l0 * 3 + 1]) * lf;
+      let b = lut[l0 * 3 + 2] + (lut[l1 * 3 + 2] - lut[l0 * 3 + 2]) * lf;
+      const thin = noise2(vv * 70.0, 1.37) - 0.5;                                             // many thin latitudinal bands
+      const shade = 1 + zonal * 0.58 + thin * 0.30 + turb * 0.08;
+      r *= shade; g *= shade; b *= shade;
+      if (sw > 0) { r += (sr - r) * sw; g += (sg - g) * sw; b += (sb - b) * sw; }
+      const i = (y * W + x) * 4;
+      px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = 255;     // Uint8ClampedArray clamps for us
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+/* Radial strip for the rings: colour in RGB, optical density in A. Inner edge = left, outer edge = right. */
+function generateRingTexture() {
+  const N = 2048, data = new Uint8Array(N * 4);
+  const zones = [   // [start, end, opacity, brightness]
+    [0.00, 0.15, 0.20, 0.78], [0.15, 0.335, 0.80, 1.00], [0.335, 0.35, 0.45, 0.9], [0.35, 0.505, 0.92, 1.0],
+    [0.505, 0.57, 0.05, 0.6], [0.57, 0.795, 0.64, 0.92], [0.795, 0.812, 0.07, 0.6], [0.812, 0.885, 0.52, 0.86],
+    [0.93, 0.955, 0.30, 0.8]
+  ];
+  const cream = [236, 220, 196], peach = [222, 174, 138], lav = [186, 168, 210], copper = [176, 118, 86];
+  for (let i = 0; i < N; i++) {
+    const u = i / (N - 1);
+    let op = 0, br = 0;
+    for (const z of zones) {
+      const w = sstep(z[0] - 0.005, z[0] + 0.005, u) * (1 - sstep(z[1] - 0.005, z[1] + 0.005, u));
+      op += z[2] * w; br += z[3] * w;
+    }
+    const broad = fbm2(u * 46, 0.37, 3), ringlet = noise2(u * 240, 3.7), micro = noise2(u * 820, 9.1);
+    const alpha = clamp(op * (0.52 + 0.7 * broad) * (0.78 + 0.34 * ringlet) * (0.9 + 0.2 * micro), 0, 1);
+    const c1 = sstep(0.3, 0.7, noise2(u * 7 + 1.3, 5.5)), c2 = sstep(0.35, 0.75, noise2(u * 19 + 4.1, 2.2));
+    const c3 = sstep(0.55, 0.85, noise2(u * 31 + 8.8, 6.1));
+    const bright = (0.6 + 0.4 * br) * (0.82 + 0.3 * ringlet);
+    for (let k = 0; k < 3; k++) {
+      let col = cream[k] + (peach[k] - cream[k]) * c1;
+      col += (lav[k] - col) * c2 * 0.7;
+      col += (copper[k] - col) * c3 * 0.6;
+      data[i * 4 + k] = clamp(col * bright, 0, 255);
+    }
+    data[i * 4 + 3] = alpha * 255;
+  }
+  const tex = new THREE.DataTexture(data, N, 1, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true; tex.needsUpdate = true;
+  return tex;
+}
+
+/* =====================================================================================
+   6. PLANET AND RING CONSTRUCTION
+   planetRoot  : follows the camera's position only (never its rotation) -> fixed place in the sky
+   planetTilt  : fixed orientation of the spin axis; the rings live here
+   planetBody  : the sphere; ONLY its rotation.y ever changes (driven by walking, see section 11)
+   ===================================================================================== */
+const planetRoot = new THREE.Group(), planetTilt = new THREE.Group();
+let planetBody, planetRings, planetSpinSign = 1;
+const planetUniforms = {
+  uPlanetCenter: { value: new THREE.Vector3() },
+  uPlanetAxis: { value: new THREE.Vector3(0, 1, 0) },
+  uPlanetLightDir: { value: new THREE.Vector3(0, 0, 1) },
+  uPlanetRadius: { value: PLANET_RADIUS },
+  uRingRange: { value: new THREE.Vector2(C.RING_INNER, C.RING_OUTER) },
+  uRingTex: { value: null },
+  uPlanetHaze: { value: C.PLANET_HAZE }
+};
+
+function buildPlanet(planetTexture, ringTexture) {
+  // Screen-space frame at the planet as seen from the player.
+  const toViewer = PLANET_DIR.clone().negate();
+  const right = new THREE.Vector3().crossVectors(PLANET_DIR, UP).normalize();
+  const up = new THREE.Vector3().crossVectors(right, PLANET_DIR).normalize();
+
+  // Spin axis: leaned sideways by RING_ROLL and tipped towards/away from the viewer by RING_OPENING.
+  const B = C.RING_OPENING * DEG, roll = C.RING_ROLL * DEG;
+  const axis = new THREE.Vector3()
+    .addScaledVector(up, Math.cos(B) * Math.cos(roll))
+    .addScaledVector(right, Math.cos(B) * Math.sin(roll))
+    .addScaledVector(toViewer, Math.sin(B)).normalize();
+  planetTilt.quaternion.setFromUnitVectors(UP, axis);
+
+  // "Clockwise" is judged around whichever pole faces the viewer. A positive rotation.y is
+  // anticlockwise seen from the north (+Y) pole and clockwise seen from the south pole.
+  planetSpinSign = axis.dot(toViewer) > 0 ? -1 : 1;
+
+  const L = C.PLANET_LIGHT;
+  const light = new THREE.Vector3().addScaledVector(right, L.x).addScaledVector(up, L.y).addScaledVector(toViewer, L.z).normalize();
+  planetUniforms.uPlanetAxis.value.copy(axis);
+  planetUniforms.uPlanetLightDir.value.copy(light);
+  planetUniforms.uRingTex.value = ringTexture;
+
+  planetBody = new THREE.Mesh(new THREE.SphereGeometry(PLANET_RADIUS, 128, 72), makeMaterial({
+    uniforms: {
+      ...planetUniforms,
+      uMap: { value: planetTexture },
+      uPlanetLight: { value: lin(C.PLANET_LIGHT_COLOR, C.PLANET_LIGHT_INTENSITY) },
+      uPlanetAmbient: { value: lin(C.PLANET_AMBIENT, C.PLANET_AMBIENT_INTENSITY) },
+      uAtmosphere: { value: lin(C.PLANET_ATMOSPHERE, C.PLANET_ATMOSPHERE_INTENSITY) },
+      uRingShadow: { value: C.RING_SHADOW_ON_PLANET }
+    },
+    vertexShader: /* glsl */`
+      varying vec2 vUv; varying vec3 vNw, vWorld, vObj;
+      void main() {
+        vUv = uv; vObj = normalize(position);
+        vNw = normalize(mat3(modelMatrix) * normal);
+        vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform sampler2D uMap, uRingTex;
+      uniform vec3 uPlanetCenter, uPlanetAxis, uPlanetLightDir, uPlanetLight, uPlanetAmbient, uAtmosphere;
+      uniform vec2 uRingRange; uniform float uPlanetRadius, uPlanetHaze, uRingShadow;
+      varying vec2 vUv; varying vec3 vNw, vWorld, vObj;
+      void main() {
+        vec3 N = normalize(vNw);
+        vec3 V = normalize(cameraPosition - vWorld);
+        vec3 alb = texture2D(uMap, vUv).rgb;
+        // Fine zonal streaks in the planet's own frame: they turn with the surface and stay crisp up close.
+        float fine = vnoise(vec2(vObj.x * 7.0 + vObj.z * 4.0, vObj.y * 95.0));
+        alb *= 0.93 + 0.14 * fine;
+
+        float ndl = dot(N, uPlanetLightDir);
+        float day = smoothstep(-0.22, 0.6, ndl);                  // soft, wide terminator
+        float ndv = clamp(dot(N, V), 0.0, 1.0);
+        float limb = mix(0.5, 1.0, pow(ndv, 0.55));               // limb darkening
+        vec3 col = alb * (uPlanetAmbient + uPlanetLight * day) * limb;
+
+        // Shadow of the rings on the cloud tops.
+        vec3 rel = vWorld - uPlanetCenter;
+        float la = dot(uPlanetLightDir, uPlanetAxis);
+        if (abs(la) > 1e-3) {
+          float t = -dot(rel, uPlanetAxis) / la;
+          if (t > 0.0) {
+            float r = length(rel + uPlanetLightDir * t) / uPlanetRadius;
+            float u = (r - uRingRange.x) / (uRingRange.y - uRingRange.x);
+            if (u > 0.0 && u < 1.0) col *= 1.0 - texture2D(uRingTex, vec2(u, 0.5)).a * uRingShadow * day;
+          }
+        }
+
+        float fres = pow(1.0 - ndv, 2.6);
+        col += uAtmosphere * fres * (0.18 + 0.82 * day);          // thin glowing atmosphere at the limb
+        // Seen through the alien sky: the planet takes on some of the sky colour.
+        col = col * (1.0 - 0.4 * uPlanetHaze) + skyCore(-V) * uPlanetHaze;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  }));
+  planetBody.rotation.y = C.PLANET_INITIAL_SPIN;
+  planetBody.frustumCulled = false;
+
+  const ringGeo = new THREE.RingGeometry(PLANET_RADIUS * C.RING_INNER, PLANET_RADIUS * C.RING_OUTER, 256, 1);
+  ringGeo.rotateX(-Math.PI / 2);                                  // lie in the equatorial plane
+  planetRings = new THREE.Mesh(ringGeo, makeMaterial({
+    uniforms: {
+      ...planetUniforms,
+      uRingOpacity: { value: C.RING_OPACITY },
+      uRingLight: { value: lin(C.PLANET_LIGHT_COLOR, C.PLANET_LIGHT_INTENSITY * C.RING_BRIGHTNESS) }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vLocal, vWorld;
+      void main() {
+        vLocal = position;
+        vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform sampler2D uRingTex;
+      uniform vec3 uPlanetCenter, uPlanetAxis, uPlanetLightDir, uRingLight;
+      uniform vec2 uRingRange; uniform float uPlanetRadius, uPlanetHaze, uRingOpacity;
+      varying vec3 vLocal, vWorld;
+      void main() {
+        float r = length(vLocal.xz) / uPlanetRadius;
+        float u = (r - uRingRange.x) / (uRingRange.y - uRingRange.x);
+        vec4 tex = texture2D(uRingTex, vec2(clamp(u, 0.001, 0.999), 0.5));
+        float a = tex.a * smoothstep(0.0, 0.012, u) * (1.0 - smoothstep(0.988, 1.0, u));
+        if (a < 0.003) discard;
+        vec3 V = normalize(cameraPosition - vWorld);
+        // Shadow the planet casts across the rings.
+        vec3 rel = vWorld - uPlanetCenter;
+        float b = dot(rel, uPlanetLightDir);
+        float perp = sqrt(max(dot(rel, rel) - b * b, 0.0));
+        float shadow = b < 0.0 ? 1.0 - smoothstep(uPlanetRadius * 0.955, uPlanetRadius * 1.03, perp) : 0.0;
+        // Sunlit face vs. the face lit by light filtering through the ring particles.
+        float sameSide = dot(uPlanetAxis, uPlanetLightDir) * dot(uPlanetAxis, V);
+        float lit = sameSide > 0.0 ? 1.0 : 0.78;
+        vec3 col = tex.rgb * uRingLight * lit * (1.0 - shadow * 0.88);
+        col = col * (1.0 - 0.35 * uPlanetHaze) + skyCore(-V) * uPlanetHaze * 0.7;
+        gl_FragColor = vec4(col, a * uRingOpacity);
+      }`,
+    side: THREE.DoubleSide, transparent: true, depthWrite: false
+  }));
+  planetRings.renderOrder = 2; planetRings.frustumCulled = false;
+
+  planetTilt.add(planetBody, planetRings);
+  planetRoot.add(planetTilt);
+  scene.add(planetRoot);
+}
+
+/* =====================================================================================
+   7. TERRAIN AND WALKING PATH
+   A grid that follows the player (snapped to its own cell size, so nothing swims). Height and all
+   surface detail are evaluated in the shader from world coordinates, which makes the walk endless.
+   ===================================================================================== */
+let ground;
+
+function buildGround() {
+  // Columns: very fine across the trail, medium over the grassland, coarse far away.
+  const xs = [0];
+  const add = v => { xs.push(v); xs.unshift(-v); };
+  [0.7, 1.4, 2.2, 3.2, 4.5, 6, 8, 10.5, 13, 16, 20].forEach(add);
+  let x = 20, step = 8;
+  while (x < 200) { x += 6; add(x); }
+  while (x < C.GROUND_HALF_SIZE + 120) { step *= 1.25; x += step; add(x); }
+  const cols = xs.length, rows = Math.round(2 * C.GROUND_HALF_SIZE / C.GROUND_CELL) + 1;
+  const pos = new Float32Array(cols * rows * 3), idx = [];
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const k = (j * cols + i) * 3;
+    pos[k] = xs[i]; pos[k + 1] = 0; pos[k + 2] = -C.GROUND_HALF_SIZE + j * C.GROUND_CELL;
+  }
+  for (let j = 0; j < rows - 1; j++) for (let i = 0; i < cols - 1; i++) {
+    const a = j * cols + i, b = a + cols, c = a + 1, d = b + 1;
+    idx.push(a, b, c, b, d, c);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+
+  ground = new THREE.Mesh(geo, makeMaterial({
+    uniforms: {
+      uSoilDark: { value: lin(C.SOIL_DARK) }, uSoilLight: { value: lin(C.SOIL_LIGHT) },
+      uPathA: { value: lin(C.PATH_COLOR_A) }, uPathB: { value: lin(C.PATH_COLOR_B) }, uPebble: { value: lin(C.PEBBLE_COLOR) },
+      uColA1: { value: lin(C.GRASS_GREEN) }, uColA2: { value: lin(C.GRASS_TEAL) },
+      uColB1: { value: lin(C.GRASS_PURPLE) }, uColB2: { value: lin(C.GRASS_VIOLET) },
+      uDry: { value: lin(C.GRASS_DRY) }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vWorld, vN;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        float e = 1.0;
+        float hx = terrainHeight(w.xz + vec2(e, 0.0)) - terrainHeight(w.xz - vec2(e, 0.0));
+        float hz = terrainHeight(w.xz + vec2(0.0, e)) - terrainHeight(w.xz - vec2(0.0, e));
+        vN = normalize(vec3(-hx, 2.0 * e, -hz));
+        w.y = terrainHeight(w.xz);
+        vWorld = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uSoilDark, uSoilLight, uPathA, uPathB, uPebble, uColA1, uColA2, uColB1, uColB2, uDry;
+      varying vec3 vWorld, vN;
+      float bumpH(vec2 p) { return vnoise(p * 3.1) + 0.5 * vnoise(p * 7.3); }
+      void main() {
+        vec2 xz = vWorld.xz;
+        float dist = length(vWorld - cameraPosition);
+        float detail = 1.0 - smoothstep(22.0, 110.0, dist);       // fine detail fades out before it can shimmer
+        vec4 biome = texture2D(uBiome, xz / BIOME_SIZE);
+        float n1 = fbm(xz * 0.33);
+        float n2 = vnoise(xz * 2.6);
+        float n3 = vnoise(xz * 8.7);
+
+        // Bare soil
+        vec3 soil = mix(uSoilDark, uSoilLight, clamp(n1 * 0.85 + (n2 - 0.5) * 0.35 * detail, 0.0, 1.0));
+        soil *= 0.82 + 0.36 * mix(0.5, n3, detail);
+        // Low ground cover, tinted like the grass that grows from it
+        vec3 gA = mix(uColA1, uColA2, n1);
+        vec3 gB = mix(uColB1, uColB2, n1);
+        vec3 cover = mix(gA, gB, smoothstep(0.38, 0.62, biome.g));
+        cover = mix(cover, uDry, biome.b * 0.45) * (0.50 + 0.22 * mix(0.5, n2, detail));
+        float c = smoothstep(0.26, 0.60, biome.r + (n2 - 0.5) * 0.4 * detail);
+        vec3 alb = mix(soil, cover, c * 0.92);
+
+        // The trail: dead straight centre line, naturally ragged edges, varied soil, pebbles, damp patches
+        float ax = abs(xz.x);
+        float side = xz.x < 0.0 ? 3.7 : 19.3;
+        float edge = PATH_HALF + (vnoise(vec2(xz.y * 0.23, side)) - 0.5) * 0.55
+                               + (vnoise(vec2(xz.y * 1.3, side + 5.0)) - 0.5) * 0.3 * detail;
+        float pm = 1.0 - smoothstep(edge - 0.32, edge + 0.3, ax + (n2 - 0.5) * 0.3 * detail);
+        float pn = fbm(xz * vec2(0.8, 0.42) + 31.0);
+        vec3 pathCol = mix(uPathA, uPathB, smoothstep(0.25, 0.75, pn));
+        pathCol *= 0.86 + 0.26 * (1.0 - smoothstep(0.0, 1.0, ax));                       // worn, paler centre
+        pathCol *= 1.0 - 0.34 * smoothstep(0.52, 0.78, vnoise(xz * vec2(0.31, 0.17) + 9.0)); // damp patches
+        pathCol *= 0.86 + 0.28 * mix(0.5, n3, detail);
+        float peb = smoothstep(0.82, 0.90, vnoise(xz * 14.0 + 3.0)) * detail;
+        pathCol = mix(pathCol, uPebble * (0.62 + 0.3 * n3), peb * 0.5);
+        alb = mix(alb, pathCol, pm);
+        alb *= 1.0 + (vnoise(xz * 37.0) - 0.5) * 0.4 * (1.0 - smoothstep(4.0, 16.0, dist));   // close-up grain
+
+        // Small-scale relief
+        vec3 N = normalize(vN);
+        if (detail > 0.02) {
+          float e = 0.07, h0 = bumpH(xz);
+          vec2 g = vec2(bumpH(xz + vec2(e, 0.0)) - h0, bumpH(xz + vec2(0.0, e)) - h0) / e;
+          N = normalize(N - vec3(g.x, 0.0, g.y) * 0.055 * detail * (0.55 + 0.45 * pm + 0.6 * peb));
+        }
+        float ndl = max(dot(N, uSunLightDir), 0.0);
+        vec3 col = alb * (hemiLight(N) + uSunColor * ndl);
+        gl_FragColor = vec4(applyFog(col, vWorld), 1.0);
+      }`
+  }));
+  ground.frustumCulled = false;
+  scene.add(ground);
+}
+
+/* =====================================================================================
+   8. GRASS AND VEGETATION
+   All plants are GPU-instanced. Each instance stores (x, z, yaw, scale) and a few random numbers;
+   the vertex shader wraps z around the player, plants it on the terrain, asks the vegetation map
+   whether it should exist here, and bends it in the wind.
+   ===================================================================================== */
+const FOLIAGE_VERTEX = /* glsl */`
+  attribute vec4 aInst;      // x, z, yaw, scale
+  attribute vec4 aInst2;     // random, colour jitter, height multiplier, glow hue
+  attribute float aKind;     // < 0.5 = leaf/stem (value doubles as a per-blade random), 1 = glowing part
+  uniform float uWrapLen, uCull, uWindAmp, uPlantHeight;
+  uniform vec2 uFadeZ;
+  uniform vec3 uColA1, uColA2, uColB1, uColB2, uDry, uGlowA, uGlowB;
+  varying vec3 vWorld, vN, vCol, vGlow;
+  varying float vT, vKind, vRand;
+  void main() {
+    float camZ = cameraPosition.z;
+    float z = camZ + mod(aInst.y - camZ + 0.5 * uWrapLen, uWrapLen) - 0.5 * uWrapLen;   // endless wrap
+    vec2 base = vec2(aInst.x, z);
+    vec4 biome = texture2D(uBiome, base / BIOME_SIZE);
+    float thr = 0.08 + aInst2.x * 0.70;
+    float keep = mix(1.0, smoothstep(thr - 0.07, thr + 0.07, biome.r), uCull);          // irregular clusters
+    float fade = 1.0 - smoothstep(uFadeZ.x, uFadeZ.y, abs(z - camZ));                    // shrink away before wrapping
+    float nearPath = smoothstep(PATH_HALF - 0.1, PATH_HALF + 1.3, abs(base.x));
+    float s = aInst.w * keep * fade * mix(0.3, 1.0, nearPath);
+
+    float cy = cos(aInst.z), sy = sin(aInst.z);
+    vec3 p = position; p.xz = vec2(cy * p.x - sy * p.z, sy * p.x + cy * p.z);
+    vec3 n = normal;   n.xz = vec2(cy * n.x - sy * n.z, sy * n.x + cy * n.z);
+    p *= vec3(s, s * aInst2.z, s);
+    vec3 wp = vec3(base.x, terrainHeight(base), base.y) + p;
+
+    // Wind: slow travelling gusts plus a quicker shimmer, strongest at the tips.
+    float t = uv.y;
+    float gust = vnoise(base * 0.03 + uTime * vec2(0.10, 0.065));
+    float sway = sin(uTime * 1.5 + base.x * 0.42 + base.y * 0.36 + aInst2.x * 6.28) * 0.6
+               + sin(uTime * 2.6 + base.x * 1.1 - base.y * 0.8 + aInst2.y * 6.28) * 0.4;
+    float bend = uWindAmp * (0.25 + 0.95 * gust + 0.42 * sway * (0.35 + gust)) * t * t * uPlantHeight * s * aInst2.z;
+    wp.xz += uWindDir * bend;
+    wp.y -= bend * 0.28 * t;
+
+    float zone = smoothstep(0.32, 0.68, biome.g + (aInst2.y - 0.5) * 0.9);
+    vec3 cA = mix(uColA1, uColA2, aInst2.x);
+    vec3 cB = mix(uColB1, uColB2, fract(aInst2.x * 7.31));
+    float br = aKind * 2.2;                                              // 0..1 per blade
+    vCol = mix(mix(cA, cB, clamp(zone + (br - 0.5) * 0.35, 0.0, 1.0)), uDry, biome.b * 0.42) * (0.72 + 0.3 * aInst2.y + 0.3 * br);
+    vGlow = mix(uGlowA, uGlowB, step(0.72, aInst2.w));
+    vWorld = wp; vN = n; vT = t; vKind = aKind; vRand = aInst2.x;
+    gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+  }`;
+const FOLIAGE_FRAGMENT = /* glsl */`
+  uniform float uTransl, uGlowIntensity, uStemGlow;
+  varying vec3 vWorld, vN, vCol, vGlow;
+  varying float vT, vKind, vRand;
+  void main() {
+    vec3 Vd = normalize(vWorld - cameraPosition);
+    vec3 col;
+    if (vKind > 0.5) {
+      // Bioluminescence: a slow individual pulse, brighter towards the heart of the bulb.
+      float pulse = 0.78 + 0.22 * sin(uTime * 1.15 + vRand * 37.0);
+      float heart = 0.6 + 0.4 * max(dot(normalize(vN), -Vd), 0.0);
+      col = vGlow * uGlowIntensity * pulse * heart;
+    } else {
+      vec3 N = normalize(vN);
+      if (!gl_FrontFacing) N = -N;
+      N = normalize(mix(N, vec3(0.0, 1.0, 0.0), 0.45));              // soft, clumpy shading rather than hard blades
+      vec3 alb = vCol * mix(0.30, 1.0, smoothstep(0.0, 0.9, vT));   // darker at the roots
+      float ndl = clamp(dot(N, uSunLightDir) * 0.62 + 0.38, 0.0, 1.0);   // wrapped light: thin leaves glow all round
+      col = alb * (hemiLight(N) + uSunColor * ndl * 0.8);
+      float back = pow(clamp(dot(Vd, uSunDir), 0.0, 1.0), 4.0);             // sunset shining through the leaves
+      col += alb * uSunColor * back * vT * uTransl;
+      col += vGlow * uStemGlow * vT * vT;                             // stems catch a little of their own glow
+    }
+    gl_FragColor = vec4(applyFog(col, vWorld), 1.0);
+  }`;
+
+/* Small mesh builder for blades and bulbs. uv.y stores "height along the plant" (0 root, 1 tip). */
+function meshBuilder() {
+  const pos = [], nor = [], uv = [], kind = [], idx = [];
+  return {
+    blade({ ang, spread, height, width, lean, droop = 0, segs, twist = 0, t0 = 0, t1 = 1, ox = 0, oz = 0 }) {
+      const dx = Math.cos(ang), dz = Math.sin(ang), sx0 = -dz, sz0 = dx;
+      const bx = ox + dx * spread, bz = oz + dz * spread, base = pos.length / 3;
+      const bladeRand = rand() * 0.45;                    // per-blade random, stored in aKind (< 0.5 = leaf)
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs, out = lean * height * t * t;
+        const cx = bx + dx * out, cz = bz + dz * out, cyv = height * t * (1 - droop * t);
+        const w = width * 0.5 * (1 - 0.84 * Math.pow(t, 1.7));
+        const a = twist * t, sx = sx0 * Math.cos(a) + dx * Math.sin(a), sz = sz0 * Math.cos(a) + dz * Math.sin(a);
+        const tilt = 0.55 + 0.4 * t;
+        const nl = Math.hypot(dx * (1 - tilt * 0.5), tilt, dz * (1 - tilt * 0.5));
+        for (const side of [-1, 1]) {
+          pos.push(cx + sx * w * side, cyv, cz + sz * w * side);
+          nor.push(dx * (1 - tilt * 0.5) / nl, tilt / nl, dz * (1 - tilt * 0.5) / nl);
+          uv.push(side * 0.5 + 0.5, t0 + (t1 - t0) * t); kind.push(bladeRand);
+        }
+      }
+      for (let s = 0; s < segs; s++) { const a = base + s * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      return { tipX: bx + dx * lean * height, tipY: height * (1 - droop), tipZ: bz + dz * lean * height };
+    },
+    bulb({ x, y, z, rx, ry, t = 1 }) {
+      const base = pos.length / 3, lon = 7, lat = 5;
+      for (let j = 0; j <= lat; j++) for (let i = 0; i <= lon; i++) {
+        const th = j / lat * Math.PI, ph = i / lon * TAU;
+        const nx = Math.sin(th) * Math.cos(ph), ny = Math.cos(th), nz = Math.sin(th) * Math.sin(ph);
+        pos.push(x + nx * rx, y + ny * ry, z + nz * rx); nor.push(nx, ny, nz); uv.push(0.5, t); kind.push(1);
+      }
+      for (let j = 0; j < lat; j++) for (let i = 0; i < lon; i++) {
+        const a = base + j * (lon + 1) + i, b = a + lon + 1;
+        idx.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    },
+    build() {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute('aKind', new THREE.Float32BufferAttribute(kind, 1));
+      g.setIndex(idx);
+      return g;
+    }
+  };
+}
+
+function instancedMesh(geometry, count, fill, material) {
+  const g = new THREE.InstancedBufferGeometry();
+  g.index = geometry.index;
+  for (const name in geometry.attributes) g.setAttribute(name, geometry.attributes[name]);
+  const a1 = new Float32Array(count * 4), a2 = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) fill(i * 4, a1, a2);
+  g.setAttribute('aInst', new THREE.InstancedBufferAttribute(a1, 4));
+  g.setAttribute('aInst2', new THREE.InstancedBufferAttribute(a2, 4));
+  g.instanceCount = count;
+  const mesh = new THREE.Mesh(g, material);
+  mesh.frustumCulled = false;       // instances are repositioned in the shader
+  scene.add(mesh);
+  return mesh;
+}
+const thinnable = [];               // grass layers whose density may be reduced on slow machines
+
+function foliageMaterial(u) {
+  return makeMaterial({
+    uniforms: {
+      uWrapLen: { value: u.wrap }, uFadeZ: { value: new THREE.Vector2(u.fade[0], u.fade[1]) },
+      uCull: { value: u.cull }, uWindAmp: { value: C.WIND_STRENGTH * (u.wind ?? 1) }, uPlantHeight: { value: u.height },
+      uColA1: { value: lin(u.colors[0]) }, uColA2: { value: lin(u.colors[1]) },
+      uColB1: { value: lin(u.colors[2]) }, uColB2: { value: lin(u.colors[3]) },
+      uDry: { value: lin(u.dry ?? C.GRASS_DRY) },
+      uGlowA: { value: lin(C.GLOW_A) }, uGlowB: { value: lin(C.GLOW_B) },
+      uTransl: { value: u.transl ?? 0.9 }, uGlowIntensity: { value: C.GLOW_INTENSITY }, uStemGlow: { value: u.stemGlow ?? 0 }
+    },
+    vertexShader: FOLIAGE_VERTEX, fragmentShader: FOLIAGE_FRAGMENT, side: THREE.DoubleSide
+  });
+}
+
+function buildVegetation() {
+  const grassColors = [C.GRASS_GREEN, C.GRASS_TEAL, C.GRASS_PURPLE, C.GRASS_VIOLET];
+  const side = () => (rand() < 0.5 ? -1 : 1);
+
+  // --- Fine grass tufts hugging the trail (short wrap distance, high detail) ---
+  let b = meshBuilder();
+  for (let i = 0; i < 6; i++) b.blade({
+    ang: (i + rand() * 0.9) / 6 * TAU, spread: 0.02 + rand() * 0.10, height: 0.18 + rand() * 0.26,
+    width: 0.024 + rand() * 0.02, lean: 0.35 + rand() * 0.9, droop: 0.15 + rand() * 0.4, segs: 3, twist: (rand() - 0.5) * 1.4
+  });
+  instancedMesh(b.build(), C.GRASS_NEAR_COUNT, (k, a1, a2) => {
+    a1[k] = side() * (C.PATH_HALF_WIDTH - 0.05 + 30 * Math.pow(rand(), 1.7));
+    a1[k + 1] = rand() * 80; a1[k + 2] = rand() * TAU; a1[k + 3] = 0.7 + rand() * 0.75;
+    a2[k] = rand(); a2[k + 1] = rand(); a2[k + 2] = 0.65 + rand() * 0.8; a2[k + 3] = 0;
+  }, foliageMaterial({ wrap: 80, fade: [28, 39], cull: 1, height: 0.42, colors: grassColors })).userData.count = C.GRASS_NEAR_COUNT;
+
+  // --- Broader clumps carrying the grassland out to the middle distance ---
+  b = meshBuilder();
+  for (let i = 0; i < 5; i++) b.blade({
+    ang: (i + rand() * 0.8) / 5 * TAU, spread: 0.04 + rand() * 0.12, height: 0.24 + rand() * 0.24,
+    width: 0.045 + rand() * 0.03, lean: 0.45 + rand() * 0.9, droop: 0.2 + rand() * 0.4, segs: 3, twist: (rand() - 0.5) * 1.2
+  });
+  instancedMesh(b.build(), C.GRASS_FAR_COUNT, (k, a1, a2) => {
+    const ax = C.PATH_HALF_WIDTH + 0.2 + 175 * Math.pow(rand(), 1.4);
+    a1[k] = side() * ax; a1[k + 1] = rand() * 360; a1[k + 2] = rand() * TAU;
+    a1[k + 3] = (0.7 + rand() * 0.6) * (1 + Math.min(ax, 120) / 140);          // larger with distance from the trail
+    a2[k] = rand(); a2[k + 1] = rand(); a2[k + 2] = 0.7 + rand() * 0.45; a2[k + 3] = 0;
+  }, foliageMaterial({ wrap: 360, fade: [150, 178], cull: 1, height: 0.45, colors: grassColors })).userData.count = C.GRASS_FAR_COUNT;
+  scene.traverse(o => { if (o.userData.count) thinnable.push(o); });
+
+  // --- Occasional tall plume plants: arching fronds in dusty rose and violet ---
+  b = meshBuilder();
+  for (let i = 0; i < 16; i++) b.blade({
+    ang: (i + rand()) / 16 * TAU, spread: 0.03 + rand() * 0.07, height: 0.9 + rand() * 0.85,
+    width: 0.035 + rand() * 0.03, lean: 0.2 + rand() * 0.85, droop: 0.2 + rand() * 0.4, segs: 5, twist: (rand() - 0.5) * 1.6
+  });
+  instancedMesh(b.build(), C.PLUME_COUNT, (k, a1, a2) => {
+    a1[k] = side() * (2.6 + 170 * Math.pow(rand(), 1.25)); a1[k + 1] = rand() * 360; a1[k + 2] = rand() * TAU;
+    a1[k + 3] = 0.6 + rand() * 0.75;
+    a2[k] = rand(); a2[k + 1] = rand(); a2[k + 2] = 0.75 + rand() * 0.6; a2[k + 3] = 0;
+  }, foliageMaterial({ wrap: 360, fade: [150, 178], cull: 0.85, height: 1.5, wind: 0.8, transl: 0.3,
+                       colors: [C.PLUME_A, C.PLUME_B, C.PLUME_C, C.PLUME_D], dry: C.PLUME_B }));
+
+  // --- Bioluminescent flowers: slender stems carrying softly glowing bulbs, growing in loose colonies ---
+  b = meshBuilder();
+  const stems = [[0, 0.52, 0.045, 0.062], [2.2, 0.36, 0.034, 0.046], [4.1, 0.27, 0.028, 0.038]];
+  for (const [ang, h, rx, ry] of stems) {
+    const lean = 0.22 + rand() * 0.2;
+    for (const rot of [0, 1.57]) b.blade({ ang, spread: 0.02, height: h, width: 0.014, lean, segs: 4, twist: rot });
+    const dx = Math.cos(ang), dz = Math.sin(ang);
+    b.bulb({ x: dx * (0.02 + lean * h), y: h + ry * 0.6, z: dz * (0.02 + lean * h), rx, ry });
+  }
+  for (let i = 0; i < 3; i++) b.blade({ ang: i * 2.1 + 1, spread: 0.02, height: 0.16, width: 0.05, lean: 0.9, segs: 2, t1: 0.3 });
+  const colonies = [];
+  for (let i = 0; i < 95; i++) colonies.push({ x: side() * (2.2 + 120 * Math.pow(rand(), 1.6)), z: rand() * 360, r: 1.2 + rand() * 4.5, hue: rand() });
+  instancedMesh(b.build(), C.FLOWER_COUNT, (k, a1, a2) => {
+    const c = colonies[Math.floor(rand() * colonies.length)];
+    const a = rand() * TAU, r = c.r * Math.sqrt(rand());
+    let x = c.x + Math.cos(a) * r;
+    if (Math.abs(x) < C.PATH_HALF_WIDTH + 0.5) x = Math.sign(c.x) * (C.PATH_HALF_WIDTH + 0.5 + rand());
+    a1[k] = x; a1[k + 1] = c.z + Math.sin(a) * r; a1[k + 2] = rand() * TAU; a1[k + 3] = 0.75 + rand() * 0.9;
+    a2[k] = rand(); a2[k + 1] = rand(); a2[k + 2] = 0.8 + rand() * 0.5;
+    a2[k + 3] = clamp(c.hue * 0.75 + rand() * 0.3, 0, 1);                      // each colony leans to one colour
+  }, foliageMaterial({ wrap: 360, fade: [150, 178], cull: 0, height: 0.5, wind: 0.7, transl: 0.5, stemGlow: 0.22,
+                       colors: [C.GRASS_GREEN, C.GRASS_TEAL, C.GRASS_TEAL, C.GRASS_PURPLE] }));
+}
+
+/* =====================================================================================
+   9. BOULDERS AND DECORATIVE OBJECTS  (instanced rocks, floating motes)
+   ===================================================================================== */
+let motes;
+
+function buildBoulders() {
+  const material = makeMaterial({
+    uniforms: {
+      uWrapLen: { value: 360 }, uFadeZ: { value: new THREE.Vector2(152, 178) },
+      uRockDark: { value: lin(C.ROCK_DARK) }, uRockLight: { value: lin(C.ROCK_LIGHT) },
+      uMoss: { value: lin(C.GRASS_TEAL, 0.45) }
+    },
+    vertexShader: /* glsl */`
+      attribute vec4 aInst;     // x, z, yaw, scale
+      attribute vec4 aInst2;    // random, stretch x, stretch y, sink
+      uniform float uWrapLen; uniform vec2 uFadeZ;
+      varying vec3 vWorld, vN, vLocal; varying float vRand, vUp;
+      void main() {
+        float camZ = cameraPosition.z;
+        float z = camZ + mod(aInst.y - camZ + 0.5 * uWrapLen, uWrapLen) - 0.5 * uWrapLen;
+        vec2 base = vec2(aInst.x, z);
+        float s = aInst.w * (1.0 - smoothstep(uFadeZ.x, uFadeZ.y, abs(z - camZ)));
+        vec3 st = vec3(aInst2.y, aInst2.z, 1.0);
+        float cy = cos(aInst.z), sy = sin(aInst.z);
+        vec3 p = position * st; p.xz = vec2(cy * p.x - sy * p.z, sy * p.x + cy * p.z);
+        vec3 n = normal / st;   n.xz = vec2(cy * n.x - sy * n.z, sy * n.x + cy * n.z);
+        vec3 wp = vec3(base.x, terrainHeight(base) - aInst2.w * s, base.y) + p * s;
+        vWorld = wp; vN = normalize(n); vLocal = position * 3.0 + aInst2.x * 40.0; vRand = aInst2.x;
+        vUp = position.y;
+        gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uRockDark, uRockLight, uMoss;
+      varying vec3 vWorld, vN, vLocal; varying float vRand, vUp;
+      void main() {
+        vec3 N = normalize(vN);
+        float n = fbm(vLocal.xy + vLocal.z * 0.7);
+        float speck = vnoise(vLocal.xz * 5.0 + vLocal.y * 3.0);
+        vec3 alb = mix(uRockDark, uRockLight, n * 0.75 + vRand * 0.25) * (0.82 + 0.36 * speck);
+        alb = mix(alb, uMoss, smoothstep(0.55, 0.85, n) * smoothstep(-0.1, 0.5, N.y) * 0.5);   // lichen on top faces
+        alb *= mix(0.55, 1.0, smoothstep(-0.25, 0.25, vUp));                                   // darker where it meets the soil
+        float ndl = max(dot(N, uSunLightDir), 0.0);
+        vec3 col = alb * (hemiLight(N) + uSunColor * ndl);
+        vec3 Vd = normalize(vWorld - cameraPosition);
+        col += alb * uAmbSky * pow(clamp(1.0 - dot(N, -Vd), 0.0, 1.0), 3.0) * 0.9;                    // cool sky sheen on the edges
+        gl_FragColor = vec4(applyFog(col, vWorld), 1.0);
+      }`
+  });
+
+  for (let variant = 0; variant < 3; variant++) {
+    // A sphere pushed around by noise and sliced by a few random planes -> a believable boulder.
+    const geo = new THREE.SphereGeometry(1, 16, 11);
+    const p = geo.attributes.position, seed = variant * 13.7 + 2.1, planes = [];
+    for (let i = 0; i < 7; i++) {
+      const v = new THREE.Vector3(rand() - 0.5, rand() - 0.35, rand() - 0.5).normalize();
+      planes.push([v, 0.72 + rand() * 0.22]);
+    }
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).normalize();
+      let r = 1 + (fbm3(v.x * 1.4 + seed, v.y * 1.4, v.z * 1.4 + seed, 3) - 0.5) * 0.75
+                + (noise3(v.x * 4.5 + seed, v.y * 4.5 + 3, v.z * 4.5) - 0.5) * 0.14;
+      for (const [pn, pd] of planes) { const d = v.dot(pn); if (d > 0) r = Math.min(r, pd / d); }
+      p.setXYZ(i, v.x * r, v.y * r * 0.72, v.z * r);
+    }
+    geo.computeVertexNormals();
+    instancedMesh(geo, Math.round(C.BOULDER_COUNT / 3), (k, a1, a2) => {
+      const size = 0.12 + Math.pow(rand(), 3.5) * 1.9;          // mostly small, a few medium, the odd large one
+      const ax = C.PATH_HALF_WIDTH + 0.35 + size * 1.25 + 170 * Math.pow(rand(), 1.7);
+      a1[k] = (rand() < 0.5 ? -1 : 1) * ax; a1[k + 1] = rand() * 360; a1[k + 2] = rand() * TAU; a1[k + 3] = size;
+      a2[k] = rand(); a2[k + 1] = 0.75 + rand() * 0.6; a2[k + 2] = 0.7 + rand() * 0.5; a2[k + 3] = 0.12 + rand() * 0.3;
+    }, material);
+  }
+}
+
+function buildMotes() {
+  // Sparse dust / spores drifting through the last light; wrapped around the camera in the shader.
+  const n = C.MOTE_COUNT, seed = new Float32Array(n * 4), pos = new Float32Array(n * 3);
+  for (let i = 0; i < n * 4; i++) seed[i] = rand();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+  motes = new THREE.Points(g, makeMaterial({
+    uniforms: {
+      uBox: { value: new THREE.Vector3(38, 12, 38) },
+      uMoteWarm: { value: lin('#ffc490', 0.8) }, uMoteCool: { value: lin(C.GLOW_A, 0.9) }
+    },
+    vertexShader: /* glsl */`
+      attribute vec4 aSeed; uniform vec3 uBox, uMoteWarm, uMoteCool;
+      varying vec4 vCol;
+      void main() {
+        vec3 p = aSeed.xyz * uBox;
+        p += vec3(uTime * 0.20, uTime * 0.025, uTime * 0.11);
+        p += vec3(sin(uTime * 0.37 + aSeed.x * 31.0), sin(uTime * 0.29 + aSeed.w * 43.0) * 0.6, cos(uTime * 0.31 + aSeed.z * 29.0)) * 0.45;
+        vec3 rel = mod(p - cameraPosition + 0.5 * uBox, uBox) - 0.5 * uBox;
+        vec3 edge = 1.0 - smoothstep(0.34, 0.5, abs(rel) / uBox);
+        rel.y += uBox.y * 0.32;
+        vec4 mv = viewMatrix * vec4(cameraPosition + rel, 1.0);
+        float dist = max(-mv.z, 0.1);
+        float tw = 0.4 + 0.6 * (0.5 + 0.5 * sin(uTime * (0.5 + aSeed.w) + aSeed.w * 61.0));
+        vCol = vec4(mix(uMoteWarm, uMoteCool, step(0.84, aSeed.w)), edge.x * edge.y * edge.z * tw * smoothstep(0.8, 3.5, dist) * (1.0 - 0.7 * smoothstep(6.0, 18.0, dist)));
+        gl_PointSize = clamp((0.03 + 0.05 * aSeed.y) * uPxScale / dist, 1.0, 14.0 * uPixelRatio);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec4 vCol;
+      void main() {
+        float a = 1.0 - smoothstep(0.0, 0.5, length(gl_PointCoord - 0.5));
+        gl_FragColor = vec4(vCol.rgb, vCol.a * a * a);
+      }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  motes.renderOrder = 5; motes.frustumCulled = false;
+  scene.add(motes);
+}
+
+/* =====================================================================================
+   10. PLAYER CAMERA AND CONTROLS
+   W/S (or arrows) move the player along PATH_DIRECTION only. The mouse changes where the player
+   LOOKS, never where they walk. No strafing, jumping or sprinting.
+   ===================================================================================== */
+const player = {
+  position: new THREE.Vector3(0, 0, 0),     // feet; x stays 0 for ever (the trail's centre line)
+  velocity: 0,                              // signed speed along the path (m/s)
+  yaw: 0, pitch: C.START_PITCH * DEG,       // smoothed view angles
+  yawTarget: 0, pitchTarget: C.START_PITCH * DEG,
+  stride: 0,                                // signed distance walked, drives the head bob
+  distanceWalked: 0
+};
+const keys = { forward: false, backward: false };
+let started = false, pointerLocked = false, hintTimer = 0;
+
+const KEY_MAP = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'backward', ArrowDown: 'backward' };
+function onKeyDown(e) {
+  const k = KEY_MAP[e.code];
+  if (!k) return;
+  e.preventDefault();
+  if (started) keys[k] = true;
+}
+function onKeyUp(e) { const k = KEY_MAP[e.code]; if (k) { keys[k] = false; e.preventDefault(); } }
+function releaseKeys() { keys.forward = keys.backward = false; }
+
+function onMouseMove(e) {
+  if (!pointerLocked) return;
+  const mx = clamp(e.movementX || 0, -250, 250), my = clamp(e.movementY || 0, -250, 250);   // ignore rare browser spikes
+  player.yawTarget -= mx * C.MOUSE_SENSITIVITY;
+  player.pitchTarget = clamp(player.pitchTarget - my * C.MOUSE_SENSITIVITY, -C.MAX_PITCH * DEG, C.MAX_PITCH * DEG);
+}
+
+function requestLook() {
+  if (!canvas.requestPointerLock) return;
+  try {
+    const p = canvas.requestPointerLock();          // newer browsers return a promise
+    if (p && typeof p.catch === 'function') p.catch(() => showHint());
+  } catch (err) { showHint(); }
+}
+function onPointerLockChange() {
+  pointerLocked = document.pointerLockElement === canvas;
+  if (!pointerLocked) releaseKeys();                 // Esc / alt-tab: come to a gentle stop
+  showHint();
+}
+function showHint() {
+  if (!started) { hintEl.classList.remove('show'); return; }
+  clearTimeout(hintTimer);
+  if (pointerLocked) {
+    hintEl.textContent = 'W / S  walk   ·   Mouse  look   ·   Esc  release';
+    hintEl.classList.add('show');
+    hintTimer = setTimeout(() => hintEl.classList.remove('show'), 5500);   // then leave the view clean
+  } else {
+    hintEl.textContent = 'Click to look around   ·   W / S  to walk';
+    hintEl.classList.add('show');
+  }
+}
+
+/* Moves the player and returns the SIGNED distance actually travelled along the path this frame. */
+const _previous = new THREE.Vector3();
+function updatePlayer(dt, time) {
+  const input = started ? (keys.forward ? 1 : 0) - (keys.backward ? 1 : 0) : 0;
+  const rate = input !== 0 ? C.ACCELERATION : C.DECELERATION;
+  player.velocity += (input * C.WALK_SPEED - player.velocity) * (1 - Math.exp(-dt * rate));
+  if (input === 0 && Math.abs(player.velocity) < 0.02) player.velocity = 0;      // come to a true, complete stop
+
+  _previous.copy(player.position);
+  player.position.addScaledVector(PATH_DIRECTION, player.velocity * dt);   // only ever along the fixed path direction
+  player.position.x = 0;
+  player.position.y = pathBaseHeight(player.position.z);
+  const dx = player.position.x - _previous.x, dz = player.position.z - _previous.z;
+  const signedDistance = dx * PATH_DIRECTION.x + dz * PATH_DIRECTION.z;    // + forward, - backward, 0 at rest
+  player.stride += signedDistance;
+  player.distanceWalked += Math.abs(signedDistance);
+
+  // View: smoothed mouse look (plus a barely perceptible drift while the intro is showing).
+  const k = 1 - Math.exp(-dt * C.LOOK_SMOOTHING);
+  let yawT = player.yawTarget, pitchT = player.pitchTarget;
+  if (!started) { yawT += Math.sin(time * 0.11) * 0.035; pitchT += Math.sin(time * 0.083 + 1.0) * 0.012; }
+  player.yaw += (yawT - player.yaw) * k;
+  player.pitch += (pitchT - player.pitch) * k;
+
+  // Gentle head bob, scaled by actual speed so it fades in and out with the walk.
+  const gait = Math.min(Math.abs(player.velocity) / C.WALK_SPEED, 1);
+  const phase = player.stride / C.STRIDE_LENGTH * Math.PI;
+  const bobY = Math.abs(Math.sin(phase)) * C.BOB_HEIGHT * gait - C.BOB_HEIGHT * 0.5 * gait;
+  const bobX = Math.sin(phase) * C.BOB_SWAY * gait;
+  camera.position.set(player.position.x + Math.cos(player.yaw) * bobX,
+                      player.position.y + C.EYE_HEIGHT + bobY,
+                      player.position.z - Math.sin(player.yaw) * bobX);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+  return signedDistance;
+}
+
+/* =====================================================================================
+   11. PLANET ROTATION SYSTEM  — the signature mechanic
+   The planet's spin is a pure function of the distance the player has really moved:
+     forward  -> clockwise         backward -> anticlockwise        standing still -> no rotation
+   No timers, no key checks, and mouse look has no influence. Only planetBody.rotation.y changes;
+   the planet's position, scale, axis and rings are never touched here.
+   ===================================================================================== */
+function updatePlanetRotation(signedDistance) {
+  if (signedDistance === 0) return;
+  planetBody.rotation.y += planetSpinSign * C.PLANET_SPIN_DIRECTION * signedDistance * C.PLANET_ROTATION_PER_METRE;
+}
+
+/* =====================================================================================
+   12. ENVIRONMENT ANIMATION
+   Wind, cloud drift, star twinkle, flower pulse and motes are all driven by uTime inside the shaders.
+   Here we only keep the "infinitely distant" things glued to the camera and the ground grid under the player.
+   ===================================================================================== */
+function updateEnvironment(dt) {
+  U.uTime.value += dt;
+  skyDome.position.copy(camera.position);
+  starField.position.copy(camera.position);
+  cloudDome.position.copy(camera.position);
+  // Fixed celestial direction: position follows the camera, orientation never does.
+  planetRoot.position.copy(camera.position).addScaledVector(PLANET_DIR, C.PLANET_DISTANCE);
+  planetUniforms.uPlanetCenter.value.copy(planetRoot.position);
+  farTerrain.position.set(0, 0, player.position.z);
+  ground.position.z = Math.round(player.position.z / C.GROUND_CELL) * C.GROUND_CELL;
+}
+
+/* =====================================================================================
+   13. INTRODUCTION INTERFACE
+   ===================================================================================== */
+function startExperience() {
+  if (started) return;
+  started = true;
+  introEl.classList.add('hidden');
+  canvas.focus({ preventScroll: true });
+  requestLook();                 // allowed here because we are inside the button's click handler
+  showHint();
+}
+
+/* =====================================================================================
+   14. MAIN ANIMATION LOOP
+   ===================================================================================== */
+const clock = new THREE.Clock();
+let running = false, frameHandle = 0;
+
+const quality = { level: 0, time: 0, frames: 0, grace: 2, pixelRatioCap: C.MAX_PIXEL_RATIO };
+function monitorPerformance(rawDt) {
+  if (!C.ADAPTIVE_QUALITY || quality.level >= 3 || rawDt > 0.3) return;     // ignore tab switches
+  quality.time += rawDt; quality.frames++;
+  if (quality.time < 2.5) return;
+  const fps = quality.frames / quality.time;
+  quality.time = 0; quality.frames = 0;
+  if (quality.grace > 0) { quality.grace--; return; }                       // let shaders compile first
+  if (fps >= C.ADAPTIVE_MIN_FPS) return;
+  quality.level++; quality.grace = 1;                                       // only ever steps down, so it cannot oscillate
+  quality.pixelRatioCap = [C.MAX_PIXEL_RATIO, 1.0, 1.0, 0.8][quality.level];
+  const density = [1, 1, 0.65, 0.45][quality.level];
+  for (const mesh of thinnable) mesh.geometry.instanceCount = Math.floor(mesh.userData.count * density);
+  onResize();
+}
+
+function frame() {
+  frameHandle = requestAnimationFrame(frame);
+  const rawDt = clock.getDelta();
+  monitorPerformance(rawDt);
+  const dt = Math.min(rawDt, 0.05);                       // clamp after tab switches
+  const signedDistance = updatePlayer(dt, clock.elapsedTime);
+  updatePlanetRotation(signedDistance);
+  updateEnvironment(dt);
+  composer.render();
+}
+
+/* =====================================================================================
+   15. WINDOW RESIZING AND CLEANUP
+   ===================================================================================== */
+function onResize() {
+  const w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
+  const pr = Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap);
+  renderer.setPixelRatio(pr);
+  renderer.setSize(w, h, false);
+  composer.setPixelRatio(pr);
+  composer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  U.uPixelRatio.value = pr;
+  U.uPxScale.value = (h * pr) / (2 * Math.tan(C.FOV * DEG / 2));   // world size -> pixels at 1 m
+}
+
+function dispose() {
+  cancelAnimationFrame(frameHandle);
+  window.removeEventListener('resize', onResize);
+  window.removeEventListener('keydown', onKeyDown);
+  window.removeEventListener('keyup', onKeyUp);
+  window.removeEventListener('blur', releaseKeys);
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('pointerlockchange', onPointerLockChange);
+  document.removeEventListener('pointerlockerror', onPointerLockChange);
+  scene.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) { for (const k in o.material.uniforms) { const v = o.material.uniforms[k].value; if (v && v.isTexture) v.dispose(); } o.material.dispose(); }
+  });
+  composer.dispose();
+  renderer.dispose();
+}
+
+/* ---- Boot: build the world in a few steps so the title screen appears immediately ---- */
+async function init() {
+  onResize();
+  await nextFrame();
+  U.uBiome.value = generateBiomeTexture();
+  buildSky();
+  buildMountains();
+  await nextFrame();
+  const planetTexture = generatePlanetTexture(C.PLANET_TEXTURE_WIDTH);
+  await nextFrame();
+  buildPlanet(planetTexture, generateRingTexture());
+  buildGround();
+  buildVegetation();
+  buildBoulders();
+  buildMotes();
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', releaseKeys);
+  window.addEventListener('pagehide', dispose, { once: true });
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });   // restored from the back/forward cache
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseKeys(); });
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('pointerlockchange', onPointerLockChange);
+  document.addEventListener('pointerlockerror', onPointerLockChange);
+  canvas.addEventListener('click', () => { if (started && !pointerLocked) requestLook(); });
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); cancelAnimationFrame(frameHandle); });
+  canvas.addEventListener('webglcontextrestored', () => { clock.getDelta(); frame(); });
+  startBtn.addEventListener('click', startExperience);
+
+  clock.start();
+  running = true;
+  frame();
+  await nextFrame();
+  startBtn.textContent = 'Start Exploring';
+  startBtn.disabled = false;
+  startBtn.focus({ preventScroll: true });
+}
+
+// Handy for tweaking from the browser console, e.g. AFTERGLOW.CONFIG or AFTERGLOW.player.
+window.AFTERGLOW = { CONFIG, player, camera, scene, renderer, quality, get planetBody() { return planetBody; }, get planetRoot() { return planetRoot; }, get ready() { return running; } };
+
+init().catch(err => {
+  console.error(err);
+  fatal('AFTERGLOW could not start: ' + (err && err.message ? err.message : err));
+});
+</script>
+</body>
+</html>

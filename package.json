@@ -2,6 +2,7 @@
     "name": "satyabuilds-lab",
     "private": true,
     "workspaces": [
+        "apps/cosmic-timeline-btn",
         "apps/cosmo-music-visualizer",
         "apps/production-panic",
         "apps/the-stars-remain",
@@ -18,10 +19,12 @@
         "build:cosmo-music-visualizer": "npm run build --workspace=cosmos-music-visualizer-argon",
         "build:production-panic": "npm run build --workspace=production-panic",
         "build:the-stars-remain": "npm run build --workspace=the-stars-remain",
-        "build:static": "npm run build:site && npm run build:cosmo-music-visualizer && npm run build:production-panic && npm run build:the-stars-remain && node scripts/build-static.mjs",
+        "build:static": "npm run build:site && npm run build:cosmo-music-visualizer && npm run build:production-panic && npm run build:the-stars-remain && npm run build:cosmic-timeline-btn && node scripts/build-static.mjs",
         "build": "npm run build:static",
         "preview": "npm run build:static && wrangler dev",
-        "deploy": "npm run build:static && wrangler deploy"
+        "deploy": "npm run build:static && wrangler deploy",
+        "dev:cosmic-timeline-btn": "npm run dev --workspace=cosmic-timeline-btn",
+        "build:cosmic-timeline-btn": "npm run build --workspace=cosmic-timeline-btn"
     },
     "devDependencies": {
         "wrangler": "^4.0.0"
