@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["scripts/dev-hub.mjs"],
       "port": 5175
+    },
+    {
+      "name": "dyson-wallpaper",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "apps/dyson-sphere/wallpaper", "--host", "127.0.0.1", "--port", "5190"],
+      "port": 5190
     }
   ]
 }

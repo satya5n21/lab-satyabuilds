@@ -1,0 +1,168 @@
+{
+  "title": "Dyson Sphere Explorer",
+  "type": "web",
+  "file": "index.html",
+  "description": "A live Dyson Sphere megastructure around a star. Click and drag the desktop to orbit it; it drifts on its own when you let go.",
+  "preview": "preview.png",
+  "tags": ["Sci-Fi", "CGI"],
+  "contentrating": "Everyone",
+  "visibility": "private",
+  "version": "1.0.0",
+  "general": {
+    "properties": {
+      "interactive": {
+        "order": 1,
+        "text": "Click and drag to orbit",
+        "type": "bool",
+        "value": true
+      },
+      "inertia": {
+        "order": 2,
+        "text": "Keep spinning after release",
+        "type": "bool",
+        "value": true
+      },
+      "autorotate": {
+        "order": 3,
+        "text": "Auto rotate",
+        "type": "bool",
+        "value": true
+      },
+      "rotatespeed": {
+        "order": 4,
+        "text": "Auto rotate speed",
+        "type": "slider",
+        "value": 1,
+        "min": 0,
+        "max": 4,
+        "step": 0.1,
+        "fraction": true,
+        "precision": 1,
+        "condition": "autorotate.value"
+      },
+      "idledelay": {
+        "order": 5,
+        "text": "Resume auto rotate after (seconds)",
+        "type": "slider",
+        "value": 1.5,
+        "min": 0,
+        "max": 20,
+        "step": 0.5,
+        "fraction": true,
+        "precision": 1,
+        "condition": "autorotate.value"
+      },
+      "zoom": {
+        "order": 6,
+        "text": "Camera distance",
+        "type": "slider",
+        "value": 13.8,
+        "min": 6,
+        "max": 26,
+        "step": 0.2,
+        "fraction": true,
+        "precision": 1
+      },
+      "mode": {
+        "order": 10,
+        "text": "Architecture",
+        "type": "combo",
+        "value": "swarm",
+        "options": [
+          { "label": "Dyson Swarm", "value": "swarm" },
+          { "label": "Dyson Shell", "value": "shell" }
+        ]
+      },
+      "density": {
+        "order": 11,
+        "text": "Collector count",
+        "type": "slider",
+        "value": 1600,
+        "min": 300,
+        "max": 3600,
+        "step": 50
+      },
+      "radius": {
+        "order": 12,
+        "text": "Orbital radius",
+        "type": "slider",
+        "value": 1,
+        "min": 0.6,
+        "max": 1.75,
+        "step": 0.01,
+        "fraction": true,
+        "precision": 2
+      },
+      "intensity": {
+        "order": 13,
+        "text": "Star intensity",
+        "type": "slider",
+        "value": 1,
+        "min": 0.4,
+        "max": 2.2,
+        "step": 0.02,
+        "fraction": true,
+        "precision": 2
+      },
+      "motion": {
+        "order": 14,
+        "text": "Collector motion",
+        "type": "bool",
+        "value": true
+      },
+      "motionspeed": {
+        "order": 15,
+        "text": "Collector motion speed",
+        "type": "slider",
+        "value": 1,
+        "min": 0,
+        "max": 4,
+        "step": 0.1,
+        "fraction": true,
+        "precision": 1,
+        "condition": "motion.value"
+      },
+      "orbits": {
+        "order": 16,
+        "text": "Orbital path lines",
+        "type": "bool",
+        "value": true
+      },
+      "vignette": {
+        "order": 17,
+        "text": "Edge vignette",
+        "type": "bool",
+        "value": true
+      },
+      "quality": {
+        "order": 20,
+        "text": "Render quality",
+        "type": "combo",
+        "value": "1",
+        "options": [
+          { "label": "Low (0.75x)", "value": "0.75" },
+          { "label": "Medium (1x)", "value": "1" },
+          { "label": "High (1.5x)", "value": "1.5" },
+          { "label": "Ultra (2x)", "value": "2" }
+        ]
+      },
+      "debug": {
+        "order": 30,
+        "text": "Show input debug overlay",
+        "type": "bool",
+        "value": false
+      },
+      "fps": {
+        "order": 21,
+        "text": "Frame rate cap",
+        "type": "combo",
+        "value": "60",
+        "options": [
+          { "label": "30 FPS", "value": "30" },
+          { "label": "60 FPS", "value": "60" },
+          { "label": "Match display", "value": "0" }
+        ]
+      }
+    }
+  }
+}
