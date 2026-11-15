@@ -1,0 +1,25 @@
+{
+  "id": "verya-planet-of-living-light",
+  "number": 8,
+  "order": 80,
+  "title": "VEYRA",
+  "category": "Planet of the living light",
+  "description": "Explore an alien world of glowing flora, from first light to the afterglow.",
+  "tag": "3D exploration",
+  "cta": "Explore",
+  "accent": "#38e6d0",
+  "status": "live",
+  "date": "2026-11-15",
+  "route": "/verya-planet-of-living-light/",
+  "output": "dist",
+  "media": [
+    "webgl"
+  ],
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 8000
+  }
+}

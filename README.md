@@ -12,6 +12,7 @@ A small monorepo for independent web experiments.
 - `pelagic`: standalone Pelagic calm ocean simulator.
 - `production-panic`: React, TypeScript, and Vite.
 - `the-stars-remain`: React, TypeScript, Vite, and Three.js.
+- `VERYA-planet-of-living-light`: React, TypeScript, Vite, Tailwind, and Three.js (VEYRA, an alien world).
 
 ## Experiment manifests
 
@@ -36,6 +37,7 @@ npm run dev:dyson-sphere
 npm run dev:pelagic
 npm run dev:production-panic
 npm run dev:the-stars-remain
+npm run dev:verya-planet-of-living-light
 ```
 
 Each command starts its own development server and prints the URL to open.
@@ -58,7 +60,7 @@ The combined site is assembled in `deployment/public`. The homepage is at `/`,
 the Dyson Sphere app is at `/dyson-sphere/`, and the music visualizer is at
 `/cosmo-music-visualizer/`. Pelagic is at `/pelagic/`, and Production Panic is
 at `/production-panic/`. The Stars Remain is at `/the-stars-remain/`, and the Cosmic Timeline is at
-`/cosmic-timeline-btn/`.
+`/cosmic-timeline-btn/`. VEYRA is at `/verya-planet-of-living-light/`.
 `wrangler.jsonc` points Cloudflare Wrangler at that assembled directory.
 
 For Cloudflare Workers Builds, set the project root to the repository root,

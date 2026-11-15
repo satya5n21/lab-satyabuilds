@@ -5,7 +5,8 @@
         "apps/cosmic-timeline-btn",
         "apps/cosmo-music-visualizer",
         "apps/production-panic",
-        "apps/the-stars-remain"
+        "apps/the-stars-remain",
+        "apps/VERYA-planet-of-living-light"
     ],
     "scripts": {
         "capture": "node scripts/capture-stills.mjs",
@@ -19,12 +20,14 @@
         "build:cosmo-music-visualizer": "npm run build --workspace=cosmos-music-visualizer-argon",
         "build:production-panic": "npm run build --workspace=production-panic",
         "build:the-stars-remain": "npm run build --workspace=the-stars-remain",
-        "build:static": "npm run build:cosmo-music-visualizer && npm run build:production-panic && npm run build:the-stars-remain && npm run build:cosmic-timeline-btn && npm run build:site && node scripts/build-static.mjs",
+        "build:static": "npm run build:cosmo-music-visualizer && npm run build:production-panic && npm run build:the-stars-remain && npm run build:cosmic-timeline-btn && npm run build:verya-planet-of-living-light && npm run build:site && node scripts/build-static.mjs",
         "build": "npm run build:static",
         "preview": "npm run build:static && wrangler dev",
         "deploy": "npm run build:static && wrangler deploy",
         "dev:cosmic-timeline-btn": "npm run dev --workspace=cosmic-timeline-btn",
-        "build:cosmic-timeline-btn": "npm run build --workspace=cosmic-timeline-btn"
+        "build:cosmic-timeline-btn": "npm run build --workspace=cosmic-timeline-btn",
+        "dev:verya-planet-of-living-light": "npm run dev --workspace=veyra-planet-of-the-living-light",
+        "build:verya-planet-of-living-light": "npm run build --workspace=veyra-planet-of-the-living-light"
     },
     "devDependencies": {
         "wrangler": "^4.0.0"
