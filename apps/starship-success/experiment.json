@@ -1,0 +1,27 @@
+{
+  "id": "starship-success",
+  "number": 9,
+  "order": 90,
+  "title": "Chopstick Catch",
+  "category": "Booster catch game",
+  "description": "Fly a falling booster back down and land it in the tower's arms, one tricky catch at a time.",
+  "tag": "Arcade game",
+  "cta": "Play",
+  "accent": "#ff8a2a",
+  "status": "live",
+  "date": "2026-11-18",
+  "route": "/starship-success/",
+  "output": "site",
+  "media": [
+    "canvas2d",
+    "audio"
+  ],
+  "input": [
+    "pointer",
+    "touch",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 2500
+  }
+}
