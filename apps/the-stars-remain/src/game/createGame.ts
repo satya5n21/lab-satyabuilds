@@ -1,13 +1,21 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { QuoteBag } from '../data/quotes';
 import { AmbientAudioEngine } from './audioEngine';
 import { createDesertEnvironment } from './createEnvironment';
 import { createMonolith } from './createMonolith';
+import { createSkyGlyph } from './createSkyGlyph';
 import { createStarfield } from './createStarfield';
 import {
+    ASCENSION,
     GamePhase,
     GameSettings,
     QualityLevel,
+    smoothRamp,
     WORLD_CONFIG,
     WorldCollider
 } from './gameTypes';
@@ -32,6 +40,7 @@ export interface GameInstance {
     retryMusicPlayback: () => void;
     updateSettings: (settings: GameSettings) => void;
     setJoystickInput: (x: number, y: number) => void;
+    skipAscension: () => void;
     rotateCameraFromTouch: (dx: number, dy: number) => void;
     dispose: () => void;
 }
@@ -61,6 +70,7 @@ export function createGame(
             retryMusicPlayback: () => { },
             updateSettings: () => { },
             setJoystickInput: () => { },
+            skipAscension: () => { },
             rotateCameraFromTouch: () => { },
             dispose: () => { }
         };
@@ -73,7 +83,8 @@ export function createGame(
     renderer.setPixelRatio(getTargetPixelRatio(settings.quality));
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    const BASE_EXPOSURE = 1.06;
+    renderer.toneMappingExposure = BASE_EXPOSURE;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x02040a, 1);
     container.appendChild(renderer.domElement);
@@ -87,6 +98,30 @@ export function createGame(
         0.15,
         1200
     );
+
+    // Post-processing: render -> star-trail afterimage -> bloom -> tone mapping/sRGB output
+    const composerTarget = new THREE.WebGLRenderTarget(1, 1, {
+        type: THREE.HalfFloatType,
+        samples: 4
+    });
+    const composer = new EffectComposer(renderer, composerTarget);
+    composer.setPixelRatio(getTargetPixelRatio(settings.quality));
+    composer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight));
+    composer.addPass(new RenderPass(scene, camera));
+
+    const afterimagePass = new AfterimagePass(0);
+    afterimagePass.enabled = false;
+    composer.addPass(afterimagePass);
+
+    const BASE_BLOOM = 0.55;
+    const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight)),
+        BASE_BLOOM,
+        0.55,
+        0.72
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
 
     const hemiLight = new THREE.HemisphereLight(0x2a3b60, 0x060911, 0.54);
     scene.add(hemiLight);
@@ -106,6 +141,9 @@ export function createGame(
 
     const monolith = createMonolith();
     scene.add(monolith.group);
+
+    const skyGlyph = createSkyGlyph();
+    scene.add(skyGlyph.group);
 
     const allColliders: WorldCollider[] = [
         ...environment.colliders,
@@ -134,6 +172,13 @@ export function createGame(
 
     let runDistanceWalked = 0;
     let hintDismissReported = false;
+
+    // Ascension clock: -1 when inactive, otherwise seconds since the monolith was touched
+    let ascensionTime = -1;
+    let ascStartYaw = 0;
+    let ascStartPitch = 0;
+    let ascTargetYaw = 0;
+    let afterimageFresh = true;
 
     const isTouchDevice = (): boolean =>
         'ontouchstart' in window ||
@@ -195,6 +240,7 @@ export function createGame(
 
     const triggerMonolithEncounter = () => {
         if (
+            phase === 'ascension' ||
             phase === 'reflection' ||
             phase === 'resetting' ||
             phase === 'start' ||
@@ -223,9 +269,33 @@ export function createGame(
         monolith.triggerInteractionSurge();
         const selectedQuote = quoteBag.nextQuote();
         callbacks.onQuoteSelected(selectedQuote);
-        audio.setReflectionMode(true);
-        audio.playMonolithActivation();
-        setPhase('reflection');
+
+        // Begin the ascension: camera will rise along the beam toward the sky glyph
+        ascensionTime = 0;
+        ascStartYaw = player.yaw;
+        ascStartPitch = player.pitch;
+        const dx = WORLD_CONFIG.MONOLITH_POS.x - player.position.x;
+        const dz = WORLD_CONFIG.MONOLITH_POS.z - player.position.z;
+        const facing = Math.atan2(-dx, -dz);
+        let delta = facing - ascStartYaw;
+        delta = Math.atan2(Math.sin(delta), Math.cos(delta));
+        ascTargetYaw = ascStartYaw + delta;
+        skyGlyph.place(player.position, ascTargetYaw);
+        audio.beginAscension();
+        setPhase('ascension');
+    };
+
+    const skipAscension = () => {
+        if (phase !== 'ascension' || ascensionTime < 1.0) return;
+        ascensionTime = ASCENSION.DURATION;
+        audio.skipAscension();
+    };
+
+    const finishAscensionIfDone = () => {
+        if (phase === 'ascension' && ascensionTime >= ASCENSION.DURATION) {
+            audio.setReflectionMode(true);
+            setPhase('reflection');
+        }
     };
 
     const isUIControlTarget = (target: EventTarget | null): boolean => {
@@ -240,6 +310,17 @@ export function createGame(
     const onKeyDown = (e: KeyboardEvent) => {
         if (phase !== 'start') {
             audio.resumeIfNeeded();
+        }
+
+        if (phase === 'ascension') {
+            if (
+                !e.repeat &&
+                (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE' || e.code === 'Escape')
+            ) {
+                e.preventDefault();
+                skipAscension();
+            }
+            return;
         }
 
         // Scenario A: When ESC is pressed while unlocked, release any held movement keys
@@ -360,6 +441,11 @@ export function createGame(
         const wasClick = dragMovedDistance < 7;
         isDraggingFallbackLook = false;
 
+        if (phase === 'ascension') {
+            skipAscension();
+            return;
+        }
+
         if (!isActiveExplorationPhase()) return;
 
         audio.resumeIfNeeded();
@@ -419,6 +505,9 @@ export function createGame(
         camera.updateProjectionMatrix();
         renderer.setPixelRatio(getTargetPixelRatio(settings.quality));
         renderer.setSize(w, h);
+        composer.setPixelRatio(getTargetPixelRatio(settings.quality));
+        composer.setSize(w, h);
+        afterimageFresh = true;
     };
 
     const onVisibilityChange = () => {
@@ -455,6 +544,24 @@ export function createGame(
         elapsedTime += dt;
 
         audio.update(dt);
+
+        if (ascensionTime >= 0) {
+            ascensionTime += dt;
+            const asc = Math.min(ascensionTime, ASCENSION.DURATION);
+            const tilt = smoothRamp(asc, ASCENSION.TILT_START, ASCENSION.TILT_END);
+            const tiltEased = tilt * tilt * (3 - 2 * tilt);
+            if (phase === 'ascension') {
+                player.yaw = ascStartYaw + (ascTargetYaw - ascStartYaw) * tiltEased;
+                player.pitch = ascStartPitch + (ASCENSION.TARGET_PITCH - ascStartPitch) * tiltEased;
+                // A brief tremor as the beam ignites
+                if (!settings.reducedMotion && asc > ASCENSION.CHARGE_END && asc < ASCENSION.CHARGE_END + 0.9) {
+                    const k = 1 - (asc - ASCENSION.CHARGE_END) / 0.9;
+                    player.pitch += Math.sin(elapsedTime * 61.0) * 0.0045 * k * k;
+                    player.yaw += Math.sin(elapsedTime * 47.0 + 1.3) * 0.003 * k * k;
+                }
+            }
+            finishAscensionIfDone();
+        }
 
         const canWalk = isActiveExplorationPhase();
         const moveResult = player.update(dt, canWalk, allColliders);
@@ -504,7 +611,8 @@ export function createGame(
             moveResult.resolvedDx,
             moveResult.resolvedDz,
             currentPixelRatio,
-            canWalk
+            canWalk,
+            ascensionTime
         );
 
         environment.update(
@@ -519,10 +627,43 @@ export function createGame(
             dt,
             elapsedTime,
             distToMonolith,
-            phase === 'reflection'
+            phase === 'reflection' || phase === 'ascension',
+            ascensionTime
         );
 
-        renderer.render(scene, camera);
+        skyGlyph.update(dt, elapsedTime, ascensionTime, currentPixelRatio);
+
+        // Post-processing choreography
+        const asc = ascensionTime;
+        if (asc >= 0) {
+            const charge = smoothRamp(asc, 0, ASCENSION.CHARGE_END);
+            const ignite = asc >= ASCENSION.CHARGE_END ? Math.exp(-(asc - ASCENSION.CHARGE_END) * 1.3) : 0;
+            const settled = smoothRamp(asc, ASCENSION.SPIN_END, ASCENSION.DURATION);
+            bloomPass.strength = BASE_BLOOM + charge * 0.3 + ignite * 0.5 - settled * 0.1;
+            renderer.toneMappingExposure = BASE_EXPOSURE + ignite * 0.28;
+
+            // Star trails: only while the camera holds still and the sky turns
+            const trailOn = asc >= ASCENSION.SPIN_START && asc < ASCENSION.TRAIL_FADE_END;
+            if (trailOn) {
+                const strength =
+                    smoothRamp(asc, ASCENSION.SPIN_START, ASCENSION.SPIN_START + 1.4) *
+                    (1 - smoothRamp(asc, ASCENSION.SPIN_END - 0.6, ASCENSION.TRAIL_FADE_END));
+                const tau = 0.04 + strength * 0.62;
+                afterimagePass.enabled = true;
+                afterimagePass.uniforms['damp'].value = afterimageFresh ? 0 : Math.exp(-dt / tau);
+                afterimageFresh = false;
+            } else {
+                afterimagePass.enabled = false;
+                afterimageFresh = true;
+            }
+        } else {
+            bloomPass.strength = BASE_BLOOM;
+            renderer.toneMappingExposure = BASE_EXPOSURE;
+            afterimagePass.enabled = false;
+            afterimageFresh = true;
+        }
+
+        composer.render(dt);
     };
 
     animFrameId = requestAnimationFrame(animate);
@@ -532,10 +673,12 @@ export function createGame(
             audio.initFromUserGesture(settings);
             runDistanceWalked = 0;
             hintDismissReported = false;
+            ascensionTime = -1;
             player.resetToSpawn();
             starfield.reset(player.position);
             environment.reset(player.position);
             monolith.reset();
+            skyGlyph.reset();
             setPhase('exploring');
             requestGamePointerLock();
         },
@@ -558,10 +701,12 @@ export function createGame(
                 if (isDisposed) return;
                 runDistanceWalked = 0;
                 hintDismissReported = false;
+                ascensionTime = -1;
                 player.resetToSpawn();
                 starfield.reset(player.position);
                 environment.reset(player.position);
                 monolith.reset();
+                skyGlyph.reset();
                 setPhase('exploring');
             }, 420);
         },
@@ -617,6 +762,8 @@ export function createGame(
 
             if (qualityChanged) {
                 renderer.setPixelRatio(getTargetPixelRatio(settings.quality));
+                composer.setPixelRatio(getTargetPixelRatio(settings.quality));
+                afterimageFresh = true;
                 starfield.setQuality(settings.quality);
                 environment.setQuality(settings.quality);
             }
@@ -624,6 +771,10 @@ export function createGame(
 
         setJoystickInput(x, y) {
             player.setJoystick(x, y);
+        },
+
+        skipAscension() {
+            skipAscension();
         },
 
         rotateCameraFromTouch(dx, dy) {
@@ -650,7 +801,12 @@ export function createGame(
             starfield.dispose();
             environment.dispose();
             monolith.dispose();
+            skyGlyph.dispose();
             audio.dispose();
+            bloomPass.dispose();
+            afterimagePass.dispose();
+            composer.dispose();
+            composerTarget.dispose();
             renderer.dispose();
 
             if (renderer.domElement.parentNode === container) {

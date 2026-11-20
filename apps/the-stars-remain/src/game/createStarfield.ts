@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { QualityLevel, StarfieldSystem, WORLD_CONFIG } from './gameTypes';
+import {
+    ASCENSION,
+    QualityLevel,
+    smoothRamp,
+    StarfieldSystem,
+    WORLD_CONFIG
+} from './gameTypes';
 
 function createSeededRandom(seed: number): () => number {
     let s = seed >>> 0;
@@ -263,7 +269,8 @@ export function createStarfield(initialQuality: QualityLevel): StarfieldSystem {
         blending: THREE.AdditiveBlending,
         uniforms: {
             uTime: { value: 0 },
-            uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) }
+            uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) },
+            uBrightness: { value: 1.0 }
         },
         vertexShader: /* glsl */ `
       attribute vec3 aColor;
@@ -294,6 +301,7 @@ export function createStarfield(initialQuality: QualityLevel): StarfieldSystem {
       }
     `,
         fragmentShader: /* glsl */ `
+      uniform float uBrightness;
       varying vec3 vColor;
       varying float vHorizonFade;
 
@@ -309,7 +317,7 @@ export function createStarfield(initialQuality: QualityLevel): StarfieldSystem {
         float halo = 0.32 * (1.0 - smoothstep(0.0, 1.0, dist));
         float intensity = (core + halo) * vHorizonFade;
 
-        gl_FragColor = vec4(vColor * intensity * 1.25, intensity);
+        gl_FragColor = vec4(vColor * intensity * 1.25 * uBrightness, intensity);
       }
     `
     });
@@ -447,10 +455,14 @@ export function createStarfield(initialQuality: QualityLevel): StarfieldSystem {
     let smoothedVelX = 0;
     let smoothedVelZ = 0;
 
+    // Ascension: the whole sky wheels around the zenith (integrated so it eases in/out)
+    let ascensionSpin = 0;
+    const ASCENSION_SPIN_PEAK_RAD_PER_SEC = 1.15;
+
     return {
         group: rootGroup,
 
-        update(dt, elapsedTime, playerPos, resolvedDx, resolvedDz, pixelRatio, allowShootingStars) {
+        update(dt, elapsedTime, playerPos, resolvedDx, resolvedDz, pixelRatio, allowShootingStars, ascensionTime) {
             rootGroup.position.copy(playerPos);
 
             starMat.uniforms.uTime.value = elapsedTime;
@@ -476,7 +488,16 @@ export function createStarfield(initialQuality: QualityLevel): StarfieldSystem {
             celestialRig.rotation.order = 'YXZ';
             celestialRig.rotation.x = accumPitch + velocityLagPitch;
             celestialRig.rotation.z = accumRoll + velocityLagRoll;
-            celestialRig.rotation.y = accumYaw + siderealYaw;
+            let spinEnvelope = 0;
+            if (ascensionTime >= 0) {
+                const rampUp = smoothRamp(ascensionTime, ASCENSION.SPIN_START, ASCENSION.SPIN_PEAK);
+                const rampDown = 1 - smoothRamp(ascensionTime, ASCENSION.SPIN_PEAK + 0.6, ASCENSION.SPIN_END);
+                spinEnvelope = rampUp * rampDown;
+                ascensionSpin += spinEnvelope * ASCENSION_SPIN_PEAK_RAD_PER_SEC * safeDt;
+            }
+            starMat.uniforms.uBrightness.value = 1.0 + spinEnvelope * 0.9;
+
+            celestialRig.rotation.y = accumYaw + siderealYaw + ascensionSpin;
 
             // Suspend active shooting stars if entering monolith reflection so quote is never distracted
             if (!allowShootingStars) {
@@ -563,6 +584,8 @@ export function createStarfield(initialQuality: QualityLevel): StarfieldSystem {
             accumYaw = 0;
             smoothedVelX = 0;
             smoothedVelZ = 0;
+            ascensionSpin = 0;
+            starMat.uniforms.uBrightness.value = 1.0;
             celestialRig.rotation.set(0, 0, 0);
             meteorActive = false;
             meteorLine.visible = false;

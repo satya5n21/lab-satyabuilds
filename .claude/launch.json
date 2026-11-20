@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "apps/dyson-sphere/wallpaper", "--host", "127.0.0.1", "--port", "5190"],
       "port": 5190
+    },
+    {
+      "name": "the-stars-remain",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:the-stars-remain"],
+      "port": 5178
     }
   ]
 }

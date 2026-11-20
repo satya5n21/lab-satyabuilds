@@ -368,3 +368,8 @@ body,
         transform: translateY(0);
     }
 }
+/* Ascension skip hint: present but deliberately quiet so it never competes with the sky */
+.skip-hint {
+    color: rgba(215, 228, 250, 0.4);
+    font-size: 0.68rem;
+}

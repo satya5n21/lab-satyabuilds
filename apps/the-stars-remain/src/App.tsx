@@ -4,6 +4,24 @@ import { createGame, GameInstance } from './game/createGame';
 import { GamePhase, GameSettings, QualityLevel } from './game/gameTypes';
 import './styles.css';
 
+const SEEN_ASCENSION_KEY = 'the-stars-remain:seen-ascension';
+
+function readSeenAscension(): boolean {
+    try {
+        return window.localStorage.getItem(SEEN_ASCENSION_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function writeSeenAscension(): void {
+    try {
+        window.localStorage.setItem(SEEN_ASCENSION_KEY, '1');
+    } catch {
+        // Storage unavailable (private mode etc.) — the skip hint just won't persist
+    }
+}
+
 export function App() {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const gameRef = useRef<GameInstance | null>(null);
@@ -17,6 +35,8 @@ export function App() {
     const [musicBlocked, setMusicBlocked] = useState<boolean>(false);
     const [webglError, setWebglError] = useState<string | null>(null);
     const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
+    const [hasSeenAscension, setHasSeenAscension] = useState<boolean>(() => readSeenAscension());
+    const [showSkipHint, setShowSkipHint] = useState<boolean>(false);
 
     const [settings, setSettings] = useState<GameSettings>({
         muted: false,
@@ -77,6 +97,22 @@ export function App() {
     useEffect(() => {
         gameRef.current?.updateSettings(settings);
     }, [settings]);
+
+    useEffect(() => {
+        if (phase === 'reflection' && !hasSeenAscension) {
+            writeSeenAscension();
+            setHasSeenAscension(true);
+        }
+    }, [phase, hasSeenAscension]);
+
+    useEffect(() => {
+        if (phase !== 'ascension' || !hasSeenAscension) {
+            setShowSkipHint(false);
+            return;
+        }
+        const timer = window.setTimeout(() => setShowSkipHint(true), 1800);
+        return () => window.clearTimeout(timer);
+    }, [phase, hasSeenAscension]);
 
     useEffect(() => {
         if (phase !== 'reflection') {
@@ -307,7 +343,7 @@ export function App() {
                         >
                             {settings.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                         </button>
-                        {phase !== 'reflection' && (
+                        {phase !== 'reflection' && phase !== 'ascension' && (
                             <button
                                 type="button"
                                 className="icon-btn"
@@ -369,6 +405,14 @@ export function App() {
                             </div>
                         )}
                     </div>
+
+                    {phase === 'ascension' && showSkipHint && (
+                        <div className="hud-bottom-prompts" style={{ pointerEvents: 'none' }}>
+                            <div className="subtle-hint skip-hint">
+                                {isTouchDevice ? 'Tap to skip' : 'Space — skip'}
+                            </div>
+                        </div>
+                    )}
 
                     {isTouchDevice && isPlaying && (
                         <div className="mobile-controls-layer">

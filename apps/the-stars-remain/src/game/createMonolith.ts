@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { getTerrainHeight } from './createEnvironment';
-import { MonolithSystem, WORLD_CONFIG, WorldCollider } from './gameTypes';
+import {
+    ASCENSION,
+    MonolithSystem,
+    ramp,
+    smoothRamp,
+    WORLD_CONFIG,
+    WorldCollider
+} from './gameTypes';
 
 export function createMonolith(): MonolithSystem {
     const rootGroup = new THREE.Group();
@@ -240,6 +247,133 @@ export function createMonolith(): MonolithSystem {
         });
     });
 
+    // 5. ASCENSION: BEAM OF LIGHT, GROUND SHOCKWAVE, AND MONOLITH FLARE
+    const tipY = 0.95 + obeliskHeight - 0.4;
+    const BEAM_MAX_HEIGHT = 1100;
+
+    const beamVertex = /* glsl */ `
+      varying vec2 vUv;
+      varying float vFacing;
+      void main() {
+        vUv = uv;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
+        vec3 toCam = normalize(cameraPosition - worldPos.xyz);
+        vFacing = abs(dot(worldNormal, toCam));
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+    const beamFragment = /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uIntensity;
+      uniform float uTime;
+      uniform float uSharpness;
+      varying vec2 vUv;
+      varying float vFacing;
+      void main() {
+        float core = pow(clamp(vFacing, 0.0001, 1.0), uSharpness);
+        // Bright at the stone, dissolving into the zenith
+        float heightFade = pow(clamp(1.0 - vUv.y, 0.0001, 1.0), 0.55);
+        // Slow luminous pulses travelling upward along the beam
+        float pulse = 0.82 + 0.18 * sin(vUv.y * 90.0 - uTime * 3.2);
+        float a = clamp(core * heightFade * pulse * uIntensity, 0.0, 16.0);
+        gl_FragColor = vec4(uColor * a, a);
+      }
+    `;
+
+    const makeBeamMat = (color: number, sharpness: number) =>
+        new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+            side: THREE.DoubleSide,
+            uniforms: {
+                uColor: { value: new THREE.Color(color) },
+                uIntensity: { value: 0 },
+                uTime: { value: 0 },
+                uSharpness: { value: sharpness }
+            },
+            vertexShader: beamVertex,
+            fragmentShader: beamFragment
+        });
+
+    const beamCoreGeo = new THREE.CylinderGeometry(0.16, 0.16, 1, 20, 1, true);
+    beamCoreGeo.translate(0, 0.5, 0);
+    const beamGlowGeo = new THREE.CylinderGeometry(1.6, 0.9, 1, 28, 1, true);
+    beamGlowGeo.translate(0, 0.5, 0);
+    disposableGeos.push(beamCoreGeo, beamGlowGeo);
+
+    const beamCoreMat = makeBeamMat(0xf4f9ff, 1.6);
+    const beamGlowMat = makeBeamMat(0x7fb2ff, 3.2);
+
+    const beamGroup = new THREE.Group();
+    beamGroup.position.y = tipY;
+    beamGroup.visible = false;
+    const beamCore = new THREE.Mesh(beamCoreGeo, beamCoreMat);
+    const beamGlow = new THREE.Mesh(beamGlowGeo, beamGlowMat);
+    beamCore.frustumCulled = false;
+    beamGlow.frustumCulled = false;
+    beamCore.renderOrder = 3;
+    beamGlow.renderOrder = 2;
+    beamGroup.add(beamGlow, beamCore);
+    rootGroup.add(beamGroup);
+
+    // Expanding ring of light that sweeps outward across the sand when the beam ignites
+    const shockGeo = new THREE.CylinderGeometry(1, 1, 4.5, 96, 1, true);
+    shockGeo.translate(0, -1.0, 0);
+    disposableGeos.push(shockGeo);
+    const shockMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        fog: false,
+        side: THREE.DoubleSide,
+        uniforms: {
+            uIntensity: { value: 0 },
+            uColor: { value: new THREE.Color(0x9cc6ff) }
+        },
+        vertexShader: /* glsl */ `
+          varying float vY;
+          varying float vCamDist;
+          void main() {
+            vY = uv.y;
+            vec4 worldPos = modelMatrix * vec4(position, 1.0);
+            vCamDist = distance(worldPos.xyz, cameraPosition);
+            gl_Position = projectionMatrix * viewMatrix * worldPos;
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform float uIntensity;
+          uniform vec3 uColor;
+          varying float vY;
+          varying float vCamDist;
+          void main() {
+            // Strong where it hugs the ground, feathering away above it;
+            // dissolves as it sweeps past the viewer so it never becomes a hard wall
+            float nearFade = smoothstep(2.0, 14.0, vCamDist);
+            float a = (1.0 - smoothstep(0.32, 1.0, vY)) * uIntensity * nearFade;
+            gl_FragColor = vec4(uColor * a, a);
+          }
+        `
+    });
+    const shockMesh = new THREE.Mesh(shockGeo, shockMat);
+    shockMesh.visible = false;
+    shockMesh.frustumCulled = false;
+    rootGroup.add(shockMesh);
+
+    // Cold flare that lights the plinth, ruins, and the surrounding sand
+    const flareLight = new THREE.PointLight(0xa8ccff, 0, 95, 1.35);
+    flareLight.position.set(0, 3.2, 0);
+    rootGroup.add(flareLight);
+    const tipLight = new THREE.PointLight(0xdfeaff, 0, 40, 1.6);
+    tipLight.position.set(0, tipY + 1.0, 0);
+    rootGroup.add(tipLight);
+
+    const seamBaseColor = new THREE.Color(0xf0f7ff);
+    const microBaseColor = new THREE.Color(0x7eb8ff);
+    const glyphBaseColor = new THREE.Color(0xc8e2ff);
+
     let activationBlend = 0;
     let interactionSurge = 0;
 
@@ -253,7 +387,7 @@ export function createMonolith(): MonolithSystem {
             interactionSurge = 1.0;
         },
 
-        update(dt, elapsedTime, distanceToPlayer, isActivated) {
+        update(dt, elapsedTime, distanceToPlayer, isActivated, ascensionTime) {
             const safeDt = Math.min(dt, 0.1);
             const targetActivation = isActivated ? 1 : 0;
             activationBlend += (targetActivation - activationBlend) * (1 - Math.exp(-safeDt * 2.6));
@@ -283,9 +417,70 @@ export function createMonolith(): MonolithSystem {
             primarySeamMat.opacity = Math.min(1.0, seamOpacity);
             seamMicroGlowMat.opacity = Math.min(0.75, microGlowOpacity);
             secondaryGlyphMat.opacity = Math.min(1.0, secondaryOpacity);
+
+            // --- Ascension choreography ---
+            const asc = ascensionTime;
+            if (asc < 0) {
+                beamGroup.visible = false;
+                shockMesh.visible = false;
+                flareLight.intensity = 0;
+                tipLight.intensity = 0;
+                primarySeamMat.color.copy(seamBaseColor);
+                seamMicroGlowMat.color.copy(microBaseColor);
+                secondaryGlyphMat.color.copy(glyphBaseColor);
+                return;
+            }
+
+            // Charge: engravings flood with light (HDR > 1 so bloom catches them)
+            const charge = smoothRamp(asc, 0, ASCENSION.CHARGE_END);
+            const ignite = asc >= ASCENSION.CHARGE_END
+                ? Math.exp(-(asc - ASCENSION.CHARGE_END) * 1.4)
+                : 0;
+            const settled = smoothRamp(asc, ASCENSION.SPIN_END, ASCENSION.DURATION);
+            const glyphBoost = 1 + charge * (2.4 - settled * 1.1) + ignite * 2.0;
+            primarySeamMat.color.copy(seamBaseColor).multiplyScalar(glyphBoost);
+            seamMicroGlowMat.color.copy(microBaseColor).multiplyScalar(1 + charge * 1.6 + ignite);
+            secondaryGlyphMat.color.copy(glyphBaseColor).multiplyScalar(glyphBoost * 0.9);
+            primarySeamMat.opacity = 1.0;
+            secondaryGlyphMat.opacity = 1.0;
+            seamMicroGlowMat.opacity = 0.75;
+
+            // Beam rises from the tip toward the zenith
+            const rise = ramp(asc, ASCENSION.CHARGE_END, ASCENSION.BEAM_RISE_END);
+            const riseEased = 1 - Math.pow(1 - rise, 3);
+            beamGroup.visible = asc >= ASCENSION.CHARGE_END;
+            beamGroup.scale.y = Math.max(0.001, riseEased * BEAM_MAX_HEIGHT);
+            const beamFlicker = 0.94 + 0.06 * Math.sin(elapsedTime * 23.0) * Math.sin(elapsedTime * 7.3);
+            const beamFadeIn = smoothRamp(asc, ASCENSION.CHARGE_END, ASCENSION.CHARGE_END + 0.25);
+            const beamStrength = (1.7 + ignite * 1.8 - settled * 0.55) * beamFlicker * beamFadeIn;
+            beamCoreMat.uniforms.uIntensity.value = beamStrength;
+            beamGlowMat.uniforms.uIntensity.value = beamStrength * 0.42;
+            beamCoreMat.uniforms.uTime.value = elapsedTime;
+            beamGlowMat.uniforms.uTime.value = elapsedTime;
+            beamGlow.scale.x = beamGlow.scale.z = 1 + ignite * 0.9;
+
+            // Shockwave sweeps outward over ~3.4s from ignition
+            const shockT = ramp(asc, ASCENSION.CHARGE_END, ASCENSION.CHARGE_END + 3.4);
+            shockMesh.visible = shockT > 0 && shockT < 1;
+            if (shockMesh.visible) {
+                const r = 4.2 + (1 - Math.pow(1 - shockT, 2.2)) * 120;
+                shockMesh.scale.set(r, 1, r);
+                shockMat.uniforms.uIntensity.value = Math.pow(1 - shockT, 1.6) * 0.75;
+            }
+
+            // Flare lights the sand: a breath in during charge, a burst on ignition, then a calm glow
+            flareLight.intensity = charge * 70 + ignite * 220 + charge * (1 - ignite) * (110 - settled * 45);
+            tipLight.intensity = (charge * 30 + ignite * 160) * (1 - settled * 0.4);
         },
 
         reset() {
+            beamGroup.visible = false;
+            shockMesh.visible = false;
+            flareLight.intensity = 0;
+            tipLight.intensity = 0;
+            primarySeamMat.color.copy(seamBaseColor);
+            seamMicroGlowMat.color.copy(microBaseColor);
+            secondaryGlyphMat.color.copy(glyphBaseColor);
             activationBlend = 0;
             interactionSurge = 0;
             primarySeamMat.opacity = 0.82;
@@ -302,6 +497,11 @@ export function createMonolith(): MonolithSystem {
             primarySeamMat.dispose();
             seamMicroGlowMat.dispose();
             secondaryGlyphMat.dispose();
+            beamCoreMat.dispose();
+            beamGlowMat.dispose();
+            shockMat.dispose();
+            flareLight.dispose();
+            tipLight.dispose();
             for (const g of disposableGeos) {
                 g.dispose();
             }
