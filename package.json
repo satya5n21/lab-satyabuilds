@@ -6,7 +6,8 @@
         "apps/cosmo-music-visualizer",
         "apps/production-panic",
         "apps/the-stars-remain",
-        "apps/VERYA-planet-of-living-light"
+        "apps/VERYA-planet-of-living-light",
+        "apps/packet-panic"
     ],
     "scripts": {
         "capture": "node scripts/capture-stills.mjs",
@@ -16,12 +17,14 @@
         "dev:pelagic": "vite apps/pelagic/site --host 127.0.0.1 --port 5177",
         "dev:starship-success": "vite apps/starship-success/site --host 127.0.0.1 --port 5178",
         "dev:production-panic": "npm run dev --workspace=production-panic",
+        "dev:packet-panic": "npm run dev --workspace=packet-panic",
         "dev:the-stars-remain": "npm run dev --workspace=the-stars-remain",
         "build:site": "node scripts/build-hub.mjs",
         "build:cosmo-music-visualizer": "npm run build --workspace=cosmos-music-visualizer-argon",
         "build:production-panic": "npm run build --workspace=production-panic",
+        "build:packet-panic": "npm run build --workspace=packet-panic",
         "build:the-stars-remain": "npm run build --workspace=the-stars-remain",
-        "build:static": "npm run build:cosmo-music-visualizer && npm run build:production-panic && npm run build:the-stars-remain && npm run build:cosmic-timeline-btn && npm run build:verya-planet-of-living-light && npm run build:site && node scripts/build-static.mjs",
+        "build:static": "npm run build:cosmo-music-visualizer && npm run build:production-panic && npm run build:the-stars-remain && npm run build:packet-panic && npm run build:cosmic-timeline-btn && npm run build:verya-planet-of-living-light && npm run build:site && node scripts/build-static.mjs",
         "build": "npm run build:static",
         "preview": "npm run build:static && wrangler dev",
         "deploy": "npm run build:static && wrangler deploy",

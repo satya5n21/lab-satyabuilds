@@ -3,12 +3,14 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js';
 import { QuoteBag } from '../data/quotes';
 import { AmbientAudioEngine } from './audioEngine';
 import { createDesertEnvironment } from './createEnvironment';
 import { createMonolith } from './createMonolith';
 import { createSkyGlyph } from './createSkyGlyph';
+import { applyDisplaySpaceOutput, displayExposure } from './displayTransform';
 import { createStarfield } from './createStarfield';
 import {
     ASCENSION,
@@ -85,6 +87,7 @@ export function createGame(
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     const BASE_EXPOSURE = 1.06;
     renderer.toneMappingExposure = BASE_EXPOSURE;
+    displayExposure.value = BASE_EXPOSURE;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x02040a, 1);
     container.appendChild(renderer.domElement);
@@ -99,7 +102,8 @@ export function createGame(
         1200
     );
 
-    // Post-processing: render -> star-trail afterimage -> bloom -> tone mapping/sRGB output
+    // Post-processing in display space (see displayTransform.ts):
+    // render -> star-trail afterimage -> bloom -> plain copy to the canvas
     const composerTarget = new THREE.WebGLRenderTarget(1, 1, {
         type: THREE.HalfFloatType,
         samples: 4
@@ -113,7 +117,8 @@ export function createGame(
     afterimagePass.enabled = false;
     composer.addPass(afterimagePass);
 
-    const BASE_BLOOM = 0.55;
+    // Kept low while walking so the night keeps its original look
+    const BASE_BLOOM = 0.3;
     const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight)),
         BASE_BLOOM,
@@ -121,7 +126,7 @@ export function createGame(
         0.72
     );
     composer.addPass(bloomPass);
-    composer.addPass(new OutputPass());
+    composer.addPass(new ShaderPass(CopyShader));
 
     const hemiLight = new THREE.HemisphereLight(0x2a3b60, 0x060911, 0.54);
     scene.add(hemiLight);
@@ -144,6 +149,8 @@ export function createGame(
 
     const skyGlyph = createSkyGlyph();
     scene.add(skyGlyph.group);
+
+    applyDisplaySpaceOutput(scene);
 
     const allColliders: WorldCollider[] = [
         ...environment.colliders,
@@ -640,7 +647,7 @@ export function createGame(
             const ignite = asc >= ASCENSION.CHARGE_END ? Math.exp(-(asc - ASCENSION.CHARGE_END) * 1.3) : 0;
             const settled = smoothRamp(asc, ASCENSION.SPIN_END, ASCENSION.DURATION);
             bloomPass.strength = BASE_BLOOM + charge * 0.3 + ignite * 0.5 - settled * 0.1;
-            renderer.toneMappingExposure = BASE_EXPOSURE + ignite * 0.28;
+            displayExposure.value = BASE_EXPOSURE + ignite * 0.28;
 
             // Star trails: only while the camera holds still and the sky turns
             const trailOn = asc >= ASCENSION.SPIN_START && asc < ASCENSION.TRAIL_FADE_END;
@@ -658,7 +665,7 @@ export function createGame(
             }
         } else {
             bloomPass.strength = BASE_BLOOM;
-            renderer.toneMappingExposure = BASE_EXPOSURE;
+            displayExposure.value = BASE_EXPOSURE;
             afterimagePass.enabled = false;
             afterimageFresh = true;
         }

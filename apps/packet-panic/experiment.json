@@ -1,0 +1,25 @@
+{
+  "id": "packet-panic",
+  "number": 10,
+  "order": 100,
+  "title": "Packet Panic",
+  "category": "Infrastructure simulator",
+  "description": "Scale a backend under live traffic. Add caches, queues and workers, and keep the database alive as users pour in.",
+  "tag": "Systems simulation",
+  "cta": "Simulate",
+  "accent": "#38bdf8",
+  "status": "live",
+  "date": "2026-11-22",
+  "route": "/packet-panic/",
+  "output": "dist",
+  "media": [
+    "canvas2d"
+  ],
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 2500
+  }
+}
