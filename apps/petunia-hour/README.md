@@ -28,7 +28,13 @@ Opens `site/index.html` on http://127.0.0.1:5191.
   petals as torques, so everything settles back on its own.
 - Wind is a travelling noise field. Lighting is a grade, dappled leaf shadow, sun rays, rim light on petals that face the
   sun, bloom and a vignette, all composited on one canvas.
-- Quality drops automatically (rim light, then bloom/shadow, then pixel ratio) if frames run slow.
+- Three quality tiers, chosen from real frame times (phones and Firefox start one tier down, and a tier is only raised again if frames stay fast):
+  - 2: rim light, per-flower glow, soft contact shadows, up to ~3.4 MP canvas.
+  - 1: no rim light or glow, ~1.6 MP canvas.
+  - 0: ~0.8 MP canvas, 30 fps cap, and flowers at rest are drawn as one pre-baked sprite. Flowers near the pointer or
+    still settling stay fully live, so touch behaves the same.
+- Cost control that applies everywhere: sunset lighting is composed on two tiny canvases and blended once each,
+  sprites are frozen to `ImageBitmap`s, off-screen flowers and leaves are skipped, and the main canvas is opaque.
 
 ## Regenerating the layout
 

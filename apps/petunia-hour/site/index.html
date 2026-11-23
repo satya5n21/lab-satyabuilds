@@ -47,7 +47,7 @@
 const D = window.PETUNIA_DATA;
 const SW = D.W, SH = D.H, TAU = Math.PI * 2;
 const cv = document.getElementById('c');
-const ctx = cv.getContext('2d');
+const ctx = cv.getContext('2d', { alpha: false });   // opaque: the scene repaints every pixel, so blending against the page is wasted work
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
@@ -96,9 +96,9 @@ function petalPath(g) {
   g.bezierCurveTo(L * 1.2, -y0 * 0.7, L * 1.2, y0 * 0.7, x0, y0); g.closePath();
   return [x0, y0];
 }
-function makePetal(type) {
-  const c = mk(PL + 22, PH), g = c.getContext('2d'), P = PAL[type];
-  g.translate(POX, POY);
+function makePetal(type, sz) {
+  const c = mk(Math.ceil((PL + 22) * sz), Math.ceil(PH * sz)), g = c.getContext('2d'), P = PAL[type];
+  g.scale(sz, sz); g.translate(POX, POY);
   const [x0, y0] = petalPath(g);
   const rg = g.createRadialGradient(0, 0, 0, 0, 0, PL * 1.0);
   for (const [o, col] of P.stops) rg.addColorStop(o, col);
@@ -120,11 +120,11 @@ function makePetal(type) {
   g.restore();
   petalPath(g); g.strokeStyle = 'rgba(0,0,0,0.14)'; g.lineWidth = 1; g.stroke();
   // rim-light twin: only the outer margin, drawn additively when the petal faces the sun
-  const r = mk(PL + 22, PH), rg2 = r.getContext('2d');
-  rg2.translate(POX, POY);
+  const r = mk(Math.ceil((PL + 22) * sz), Math.ceil(PH * sz)), rg2 = r.getContext('2d');
+  rg2.scale(sz, sz); rg2.translate(POX, POY);
   rg2.beginPath(); rg2.moveTo(x0, -y0); rg2.bezierCurveTo(PL * 1.2, -y0 * 0.7, PL * 1.2, y0 * 0.7, x0, y0);
-  rg2.lineCap = 'round'; rg2.strokeStyle = 'rgba(255,226,170,0.95)'; rg2.lineWidth = 3.6; rg2.shadowColor = 'rgba(255,190,110,0.95)'; rg2.shadowBlur = 9; rg2.stroke();
-  return { base: c, rim: r };
+  rg2.lineCap = 'round'; rg2.strokeStyle = 'rgba(255,226,170,0.95)'; rg2.lineWidth = 3.6; rg2.shadowColor = 'rgba(255,190,110,0.95)'; rg2.shadowBlur = 9 * sz; rg2.stroke();
+  return { base: c, rim: r, s: sz };
 }
 function makeThroat(type) {
   const c = mk(64, 64), g = c.getContext('2d'), T = PAL[type].throat;
@@ -143,25 +143,35 @@ function radialSprite(size, stops) {
   g.fillStyle = rg; g.fillRect(0, 0, size, size); return c;
 }
 const PET = {}, THR = {};
-for (let t = 0; t < 5; t++) { PET[t] = makePetal(t); THR[t] = makeThroat(t); }
-const AO = radialSprite(64, [[0, 'rgba(14,6,22,0.58)'], [0.55, 'rgba(14,6,22,0.34)'], [1, 'rgba(14,6,22,0)']]);
-const GLOW = radialSprite(64, [[0, 'rgba(255,196,120,0.9)'], [0.4, 'rgba(255,170,90,0.35)'], [1, 'rgba(255,150,80,0)']]);
-const POLLEN = radialSprite(16, [[0, 'rgba(255,240,160,1)'], [0.4, 'rgba(255,205,90,0.7)'], [1, 'rgba(255,190,60,0)']]);
-const MOTE = radialSprite(16, [[0, 'rgba(255,236,200,1)'], [0.35, 'rgba(255,214,160,0.55)'], [1, 'rgba(255,200,140,0)']]);
+// three sizes per petal: small flowers sample a small sprite instead of shrinking a big one every frame
+for (let t = 0; t < 5; t++) { PET[t] = [makePetal(t, 1), makePetal(t, 0.5), makePetal(t, 0.28)]; THR[t] = makeThroat(t); }
+const leafSprites = new Map();
+function leafSprite(r, g, b) {
+  const q = (v) => ((v >> 4) << 4) + 8, key = (q(r) << 16) | (q(g) << 8) | q(b);
+  let c = leafSprites.get(key); if (c) return c;
+  c = mk(44, 24); const x = c.getContext('2d');
+  x.fillStyle = `rgb(${q(r)},${q(g)},${q(b)})`; x.beginPath(); x.moveTo(0, 12); x.quadraticCurveTo(22, -2, 44, 12); x.quadraticCurveTo(22, 26, 0, 12); x.fill();
+  x.strokeStyle = 'rgba(255,255,220,0.18)'; x.lineWidth = 1; x.beginPath(); x.moveTo(3, 12); x.lineTo(38, 12); x.stroke();
+  leafSprites.set(key, c); return c;
+}
+let AO = radialSprite(64, [[0, 'rgba(14,6,22,0.58)'], [0.55, 'rgba(14,6,22,0.34)'], [1, 'rgba(14,6,22,0)']]);
+let GLOW = radialSprite(64, [[0, 'rgba(255,196,120,0.9)'], [0.4, 'rgba(255,170,90,0.35)'], [1, 'rgba(255,150,80,0)']]);
+let POLLEN = radialSprite(16, [[0, 'rgba(255,240,160,1)'], [0.4, 'rgba(255,205,90,0.7)'], [1, 'rgba(255,190,60,0)']]);
+let MOTE = radialSprite(16, [[0, 'rgba(255,236,200,1)'], [0.35, 'rgba(255,214,160,0.55)'], [1, 'rgba(255,200,140,0)']]);
 
 // ---------------------------------------------------------------- world
 const flowers = D.flowers.map(([x, y, r, c]) => {
   let type = c;
   if (c === 3 && x < 620 && y > 400 && !(x < 60 && y > 880)) type = 4;     // the left-hand reds are the white-striped ones
   const R = clamp(r * 1.3, 19, 76);
-  const f = { x, y, R, type, rot: rnd() * TAU, ox: 0, oy: 0, vx: 0, vy: 0, puff: 0, hover: 0, lit: 0.5, sunAng: 0, ph: rnd() * TAU, z: y + R * 0.35 + rnd() * 8, petals: [] };
+  const f = { x, y, R, type, rot: rnd() * TAU, ox: 0, oy: 0, vx: 0, vy: 0, live: false, liveUntil: 0, puff: 0, hover: 0, lit: 0.5, sunAng: 0, ph: rnd() * TAU, z: y + R * 0.35 + rnd() * 8, petals: [] };
   for (let i = 0; i < 5; i++) f.petals.push({ a: i * TAU / 5 + (rnd() - 0.5) * 0.2, th: 0, w: 0, grow: 1, regrow: 0, len: 0.92 + rnd() * 0.14, ph: rnd() * TAU });
   return f;
 }).sort((a, b) => a.z - b.z);
 
 const leaves = D.leaves.map(([x, y, r, g, b]) => {
-  const k = 0.82 + rnd() * 0.36, L = R_(22, 38);
-  return { x, y, a0: rnd() * TAU, L, W: L * R_(0.28, 0.4), ph: rnd() * TAU, col: `rgb(${clamp(r * k * 1.05, 0, 255) | 0},${clamp(g * k * 1.12, 0, 255) | 0},${clamp(b * k, 0, 255) | 0})` };
+  const k = 0.82 + rnd() * 0.36, L = R_(22, 38), W = L * R_(0.28, 0.4);
+  return { x, y, a0: rnd() * TAU, L, ky: (W / L) / 0.32, ph: rnd() * TAU, spr: leafSprite(clamp(r * k * 1.05, 0, 255) | 0, clamp(g * k * 1.12, 0, 255) | 0, clamp(b * k, 0, 255) | 0) };
 }).sort((a, b) => a.y - b.y);
 
 const loose = [], pollen = [], rings = [];
@@ -188,7 +198,10 @@ const bg = mk(2, 2), baseCv = mk(D.gw, D.gh);
 { const bin = atob(D.base), id = baseCv.getContext('2d').createImageData(D.gw, D.gh);
   for (let i = 0; i < D.gw * D.gh; i++) { id.data[i * 4] = bin.charCodeAt(i * 3); id.data[i * 4 + 1] = bin.charCodeAt(i * 3 + 1); id.data[i * 4 + 2] = bin.charCodeAt(i * 3 + 2); id.data[i * 4 + 3] = 255; }
   baseCv.getContext('2d').putImageData(id, 0, 0); }
-let vw = 0, vh = 0, dpr = 1, scale = 1, offX = 0, offY = 0, K = 1, OX = 0, OY = 0, bgScale = 1, quality = 2;
+// Phones and Firefox (software-heavy canvas) start one tier lower; the frame loop raises or lowers it from real frame times.
+const UA = navigator.userAgent, isMobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|Mobile/i.test(UA), isFirefox = /Firefox\//.test(UA);
+let vw = 0, vh = 0, dpr = 1, scale = 1, offX = 0, offY = 0, K = 1, OX = 0, OY = 0, bgScale = 1, quality = isMobile || isFirefox ? 1 : 2, ceiling = 2;
+const vis = { x0: 0, y0: 0, x1: SW, y1: SH };           // scene-space rectangle that is actually on screen
 
 function terracotta(g, x0, x1, rimTop, rimBot, bodyBot) {
   const w = x1 - x0;
@@ -321,17 +334,20 @@ function update(dt, t) {
     f.sunAng = psi + Math.PI;
     f.lit = clamp(0.34 + rayI(psi, t) * 0.85 + (f.x / SW) * 0.22 + (1 - f.y / SH) * 0.1, 0, 1);
     let tx = Math.cos(A) * S * 8, ty = Math.sin(A) * S * 4 + Math.sin(t * 0.9 + f.ph) * 0.8 * S;
-    let hover = 0;
+    let hover = 0, near = false;
     for (const p of ps) {
       const dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy);
       if (d < 140) { const m = (1 - d / 140), k = m * m * (p.down ? 1.9 : 1.0) * (0.6 + Math.min(1.3, Math.hypot(p.vx, p.vy) / 500)); tx += dx / (d || 1) * 15 * k; ty += dy / (d || 1) * 15 * k; }
       if (d < f.R * 1.05 && !p.touch) hover = 1;
+      if (d < f.R + 130) near = true;
     }
     f.vx += (30 * (tx - f.ox) - 5.2 * f.vx) * dt; f.vy += (30 * (ty - f.oy) - 5.2 * f.vy) * dt;
     f.ox += f.vx * dt; f.oy += f.vy * dt;
     f.puff *= Math.pow(0.04, dt); f.hover = lerp(f.hover, hover, 1 - Math.pow(0.001, dt));
     const RM = 100;
+    let growing = false, mw = 0;
     for (const p of f.petals) {
+      if (p.grow < 1) growing = true; const aw = Math.abs(p.w); if (aw > mw) mw = aw;
       if (p.grow < 1) { if (now >= p.regrow) p.grow = Math.min(1, p.grow + dt * 0.22); if (p.grow <= 0.03) continue; }
       const a = f.rot + p.a + p.th;
       let target = 0.3 * S * Math.sin(A - a) + 0.05 * S * Math.sin(t * 6.3 + p.ph + f.ph) * (0.4 + S);
@@ -342,6 +358,8 @@ function update(dt, t) {
       }
       p.w += (74 * (target - p.th) - 7.5 * p.w) * dt; p.th = clamp(p.th + p.w * dt, -1.35, 1.35);
     }
+    if (near || growing || f.puff > 0.03 || f.hover > 0.03 || mw > 1.0) f.liveUntil = t + 0.9;
+    f.live = t < f.liveUntil;
   }
   for (let i = loose.length - 1; i >= 0; i--) {
     const p = loose[i]; p.life += dt;
@@ -369,42 +387,83 @@ function update(dt, t) {
 // ---------------------------------------------------------------- draw
 function tf(x, y, a, sx, sy) { const c = Math.cos(a), s = Math.sin(a); ctx.setTransform(K * c * sx, K * s * sx, -K * s * sy, K * c * sy, K * x + OX, K * y + OY); }
 function sceneT() { ctx.setTransform(K, 0, 0, K, OX, OY); }
-const dap = mk(Math.ceil(SW / 8), Math.ceil(SH / 8)), dapG = dap.getContext('2d');
-const bloom = mk(2, 2), bloomG = bloom.getContext('2d');
-const canFilter = 'filter' in CanvasRenderingContext2D.prototype && !/^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+// Light is composed on two tiny screen-space canvases and blended onto the main canvas once each:
+// a multiply map (dappled shade + sunset grade + vignette) and an additive map (sun glow + rays).
+const lm = mk(8, 8), lmG = lm.getContext('2d'), am = mk(8, 8), amG = am.getContext('2d');
+const LM_DS = 6, AM_DS = 4;
+function sizeMaps() {
+  lm.width = Math.max(8, Math.ceil(cv.width / LM_DS)); lm.height = Math.max(8, Math.ceil(cv.height / LM_DS));
+  am.width = Math.max(8, Math.ceil(cv.width / AM_DS)); am.height = Math.max(8, Math.ceil(cv.height / AM_DS));
+}
+const onScreen = (x, y, m) => x > vis.x0 - m && x < vis.x1 + m && y > vis.y0 - m && y < vis.y1 + m;
 
 function drawLeaves(t) {
-  for (const l of leaves) {
+  const step = quality <= 0 ? 2 : 1;
+  for (let i = 0; i < leaves.length; i += step) {
+    const l = leaves[i];
+    if (!onScreen(l.x, l.y, 40)) continue;
     windAt(l.x, l.y, t);
-    const a = l.a0 + Math.sin(t * 1.3 + l.ph) * 0.07 + 0.35 * WS * Math.sin(WA - l.a0);
-    tf(l.x, l.y, a, 1, 1);
-    ctx.fillStyle = l.col; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(l.L * 0.5, -l.W, l.L, 0); ctx.quadraticCurveTo(l.L * 0.5, l.W, 0, 0); ctx.fill();
+    const a = l.a0 + Math.sin(t * 1.3 + l.ph) * 0.07 + 0.35 * WS * Math.sin(WA - l.a0), sx = l.L / 44;
+    tf(l.x, l.y, a, sx, sx * l.ky); ctx.drawImage(l.spr, 0, -12);
   }
 }
+// Lowest tier: a rotated sprite costs ~15x an axis-aligned one on CPU-rasterised canvases, so a flower at rest is
+// baked into one sprite and blitted. Flowers being touched (or still settling) stay fully live.
+const bakedMap = new Map(); let bakedK = 0, bakeBudget = 0;
+function getBaked(f) {
+  if (bakedK !== K) { bakedMap.clear(); bakedK = K; }
+  let b = bakedMap.get(f); if (b) return b;
+  if (bakeBudget <= 0) return null;
+  bakeBudget--;
+  const size = Math.ceil(f.R * 2.05 * K) + 2, c = mk(size, size), g = c.getContext('2d'), h = size / 2;
+  const devR = f.R * K, spr = PET[f.type][devR >= 58 ? 0 : devR >= 30 ? 1 : 2], sz = spr.s, sc = f.R / PL / sz * K;
+  for (const p of f.petals) {
+    const a = f.rot + p.a, cs = Math.cos(a), sn = Math.sin(a), sx = sc * p.len;
+    g.setTransform(cs * sx, sn * sx, -sn * sc, cs * sc, h, h); g.drawImage(spr.base, -POX * sz, -POY * sz);
+  }
+  const ts = f.R * 0.37 / 32 * K, cs = Math.cos(f.rot) * ts, sn = Math.sin(f.rot) * ts;
+  g.setTransform(cs, sn, -sn, cs, h, h); g.drawImage(THR[f.type], -32, -32);
+  b = { img: c, size }; bakedMap.set(f, b);
+  if (typeof createImageBitmap === 'function') createImageBitmap(c).then((bm) => { b.img = bm; }).catch(() => {});
+  return b;
+}
 function drawFlowers(t) {
-  const rim = quality >= 2;
+  const rim = quality >= 2, glow = quality >= 2, ao = quality >= 1, bake = quality === 0;
+  let additive = false; bakeBudget = 30;
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   for (const f of flowers) {
+    if (!onScreen(f.x, f.y, f.R + 30)) continue;
     const cx = f.x + f.ox, cy = f.y + f.oy, R = f.R * (1 + f.puff * 0.16 + f.hover * 0.05);
-    sceneT(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(AO, cx - R * 1.36, cy - R * 1.28, R * 2.72, R * 2.72);
-    const spr = PET[f.type], sc = R / PL;
+    if (bake && !f.live) {
+      const b = getBaked(f);
+      if (b) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(b.img, Math.round(cx * K + OX - b.size / 2), Math.round(cy * K + OY - b.size / 2)); continue; }
+    }
+    sceneT();
+    if (additive) { ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; additive = false; }
+    if (ao) ctx.drawImage(AO, cx - R * 1.36, cy - R * 1.28, R * 2.72, R * 2.72);
+    const devR = R * K, spr = PET[f.type][devR >= 58 ? 0 : devR >= 30 ? 1 : 2], sz = spr.s, sc = R / PL / sz, ox = -POX * sz, oy = -POY * sz, img = spr.base;
     for (const p of f.petals) {
       if (p.grow < 0.03) continue;
       const a = f.rot + p.a + p.th, e = p.grow < 1 ? smooth(p.grow) : 1, fore = 1 - 0.24 * Math.min(1, Math.abs(p.th) * 1.8);
       tf(cx, cy, a, sc * p.len * fore * e, sc * (1 + 0.05 * Math.abs(p.th)) * e);
-      ctx.drawImage(spr.base, -POX, -POY);
+      ctx.drawImage(img, ox, oy);
     }
     tf(cx, cy, f.rot, R * 0.37 / 32, R * 0.37 / 32); ctx.drawImage(THR[f.type], -32, -32);
-    if (f.lit > 0.22) {
-      ctx.globalCompositeOperation = 'lighter';
-      if (rim) for (const p of f.petals) {
-        if (p.grow < 0.5) continue;
-        const a = f.rot + p.a + p.th, al = f.lit * Math.max(0, Math.cos(a - f.sunAng)) * 0.95;
-        if (al < 0.07) continue;
-        ctx.globalAlpha = al; tf(cx, cy, a, sc * p.len, sc); ctx.drawImage(spr.rim, -POX, -POY);
+    if (f.lit > 0.22 || f.hover > 0.05) {
+      if (rim && f.lit > 0.22) {
+        ctx.globalCompositeOperation = 'lighter'; additive = true;
+        for (const p of f.petals) {
+          if (p.grow < 0.5) continue;
+          const a = f.rot + p.a + p.th, al = f.lit * Math.max(0, Math.cos(a - f.sunAng)) * 0.95;
+          if (al < 0.07) continue;
+          ctx.globalAlpha = al; tf(cx, cy, a, sc * p.len, sc); ctx.drawImage(spr.rim, ox, oy);
+        }
       }
-      sceneT(); ctx.globalAlpha = clamp(0.15 * f.lit * f.lit + f.hover * 0.2, 0, 0.35);
-      ctx.drawImage(GLOW, cx - R * 1.2, cy - R * 1.2, R * 2.4, R * 2.4);
+      if (glow || f.hover > 0.05) {
+        if (!additive) { ctx.globalCompositeOperation = 'lighter'; additive = true; }
+        sceneT(); ctx.globalAlpha = clamp(0.15 * f.lit * f.lit + f.hover * 0.2, 0, 0.35);
+        ctx.drawImage(GLOW, cx - R * 1.2, cy - R * 1.2, R * 2.4, R * 2.4);
+      }
     }
   }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -413,7 +472,7 @@ function drawParticles(t) {
   for (const p of loose) {
     const k = p.life / p.max, al = 1 - smooth((k - 0.7) / 0.3);
     ctx.globalAlpha = al; tf(p.x, p.y, p.rot, p.size * 0.62, p.size * 0.62 * Math.cos(t * 5 + p.ph));
-    ctx.drawImage(PET[p.type].base, -POX, -POY);
+    ctx.drawImage(PET[p.type][0].base, -POX, -POY);
   }
   sceneT(); ctx.globalCompositeOperation = 'lighter';
   for (const p of pollen) { ctx.globalAlpha = 1 - smooth(p.life / p.max); ctx.drawImage(POLLEN, p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz); }
@@ -421,72 +480,62 @@ function drawParticles(t) {
 }
 function drawLighting(t) {
   const d = state.dusk, lc = lightCol;
-  // dappled leaf shadow (low-res, multiplied)
+  // ---- multiply map: leaf shadow, sunset grade, vignette
+  const lw = lm.width, lh = lm.height;
+  lmG.globalCompositeOperation = 'source-over'; lmG.setTransform(1, 0, 0, 1, 0, 0); lmG.fillStyle = '#fff'; lmG.fillRect(0, 0, lw, lh);
   if (quality >= 1) {
-    dapG.globalCompositeOperation = 'source-over'; dapG.setTransform(1, 0, 0, 1, 0, 0); dapG.fillStyle = '#fff'; dapG.fillRect(0, 0, dap.width, dap.height);
+    const k = K / LM_DS; lmG.setTransform(k, 0, 0, k, OX / LM_DS, OY / LM_DS);
     for (const s of shades) {
+      if (!onScreen(s.x, s.y, s.r)) continue;
       windAt(s.x, s.y, t);
-      const x = (s.x + Math.sin(t * s.sp + s.ph) * 26 + Math.cos(WA) * WS * 18 * Math.sin(t * 0.7 + s.ph)) / 8, y = (s.y + Math.cos(t * s.sp * 0.8 + s.ph) * 16) / 8, r = s.r / 8;
-      const away = clamp(1.05 - (s.x / SW) * 0.8, 0.2, 1);
-      const g = dapG.createRadialGradient(x, y, 0, x, y, r);
+      const x = s.x + Math.sin(t * s.sp + s.ph) * 26 + Math.cos(WA) * WS * 18 * Math.sin(t * 0.7 + s.ph), y = s.y + Math.cos(t * s.sp * 0.8 + s.ph) * 16;
+      const away = clamp(1.05 - (s.x / SW) * 0.8, 0.2, 1), g = lmG.createRadialGradient(x, y, 0, x, y, s.r);
       g.addColorStop(0, `rgba(70,28,96,${s.a * away * (0.55 + d * 0.3)})`); g.addColorStop(1, 'rgba(70,28,96,0)');
-      dapG.fillStyle = g; dapG.fillRect(x - r, y - r, r * 2, r * 2);
+      lmG.fillStyle = g; lmG.fillRect(x - s.r, y - s.r, s.r * 2, s.r * 2);
     }
-    sceneT(); ctx.globalCompositeOperation = 'multiply'; ctx.imageSmoothingEnabled = true; ctx.drawImage(dap, 0, 0, SW, SH);
   }
-  // overall sunset grade (screen space)
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  lmG.setTransform(1, 0, 0, 1, 0, 0); lmG.globalCompositeOperation = 'multiply';
   const near = mix3([255, 238, 208], [255, 176, 134], d), far = mix3([198, 162, 172], [104, 72, 134], d), midc = mix3(near, far, 0.38);
-  const gr = ctx.createLinearGradient(cv.width, 0, 0, cv.height);
+  const gr = lmG.createLinearGradient(lw, 0, 0, lh);
   gr.addColorStop(0, rgba(near, 1)); gr.addColorStop(0.5, rgba(midc, 1)); gr.addColorStop(1, rgba(far, 1));
-  ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = gr; ctx.fillRect(0, 0, cv.width, cv.height);
-  // warm wash radiating from the sun
-  sceneT();
-  const wash = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, SW * 1.45);
-  wash.addColorStop(0, rgba(lc, 0.55)); wash.addColorStop(0.55, rgba(lc, 0.14)); wash.addColorStop(1, rgba(lc, 0));
-  ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = wash; ctx.fillRect(-SW, -SH, SW * 3, SH * 3);
-  // sun glow + god rays
-  ctx.globalCompositeOperation = 'lighter';
-  const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, SW * 0.95);
-  glow.addColorStop(0, rgba(lc, 0.34)); glow.addColorStop(0.35, rgba(lc, 0.1)); glow.addColorStop(1, rgba(lc, 0));
-  ctx.fillStyle = glow; ctx.fillRect(-SW, -SH, SW * 3, SH * 3);
+  lmG.fillStyle = gr; lmG.fillRect(0, 0, lw, lh);
+  const diag = Math.hypot(lw, lh), vg = lmG.createRadialGradient(lw * 0.55, lh * 0.45, diag * 0.28, lw * 0.5, lh * 0.5, diag * 0.74);
+  vg.addColorStop(0, 'rgb(255,255,255)'); vg.addColorStop(1, rgba(mix3([96, 70, 104], [58, 32, 78], d), 1));
+  lmG.fillStyle = vg; lmG.fillRect(0, 0, lw, lh);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'multiply'; ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(lm, 0, 0, cv.width, cv.height);
+
+  // ---- additive map: warm wash + sun glow + god rays
+  const aw = am.width, ah = am.height, ak = K / AM_DS;
+  amG.setTransform(1, 0, 0, 1, 0, 0); amG.globalCompositeOperation = 'source-over'; amG.fillStyle = '#000'; amG.fillRect(0, 0, aw, ah);
+  amG.setTransform(ak, 0, 0, ak, OX / AM_DS, OY / AM_DS); amG.globalCompositeOperation = 'lighter';
+  const glow = amG.createRadialGradient(sunX, sunY, 0, sunX, sunY, SW * 1.25);
+  glow.addColorStop(0, rgba(lc, 0.62)); glow.addColorStop(0.3, rgba(lc, 0.24)); glow.addColorStop(1, rgba(lc, 0));
+  amG.fillStyle = glow; amG.fillRect(-SW, -SH, SW * 3, SH * 3);
   const Ld = SW * 2.4, amp = 0.3 + 0.1 * d;
   for (const r of RAYS) {
     const phi = thetaC + r.off + 0.015 * Math.sin(t * 0.12 + r.ph), v = r.amp * (0.62 + 0.38 * Math.sin(t * r.sp + r.ph));
-    const gx = sunX + Math.cos(phi) * Ld, gy = sunY + Math.sin(phi) * Ld, lg = ctx.createLinearGradient(sunX, sunY, gx, gy);
+    const gx = sunX + Math.cos(phi) * Ld, gy = sunY + Math.sin(phi) * Ld, lg = amG.createLinearGradient(sunX, sunY, gx, gy);
     lg.addColorStop(0, rgba(lc, 0.9)); lg.addColorStop(0.45, rgba(lc, 0.5)); lg.addColorStop(1, rgba(lc, 0));
-    ctx.fillStyle = lg;
+    amG.fillStyle = lg;
     for (let k = 0; k < 3; k++) {
-      const hw = r.hw * (0.45 + k * 0.5); ctx.globalAlpha = amp * v * (k === 0 ? 0.9 : 0.5);
-      ctx.beginPath(); ctx.moveTo(sunX, sunY); ctx.lineTo(sunX + Math.cos(phi - hw) * Ld, sunY + Math.sin(phi - hw) * Ld); ctx.lineTo(sunX + Math.cos(phi + hw) * Ld, sunY + Math.sin(phi + hw) * Ld); ctx.closePath(); ctx.fill();
+      const hw = r.hw * (0.45 + k * 0.5); amG.globalAlpha = amp * v * (k === 0 ? 0.9 : 0.5);
+      amG.beginPath(); amG.moveTo(sunX, sunY); amG.lineTo(sunX + Math.cos(phi - hw) * Ld, sunY + Math.sin(phi - hw) * Ld); amG.lineTo(sunX + Math.cos(phi + hw) * Ld, sunY + Math.sin(phi + hw) * Ld); amG.closePath(); amG.fill();
     }
   }
-  ctx.globalAlpha = 1;
-  // dust and pollen glittering in the beams
+  amG.globalAlpha = 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(am, 0, 0, cv.width, cv.height);
+
+  // ---- dust in the beams and click ripples (few, cheap draws straight onto the canvas)
+  sceneT();
   for (const m of motes) {
+    if (!onScreen(m.x, m.y, 10)) continue;
     const I = rayI(Math.atan2(m.y - sunY, m.x - sunX), t); if (I < 0.1) continue;
     ctx.globalAlpha = I * (0.35 + 0.65 * Math.abs(Math.sin(t * m.s + m.ph))) * 0.8; const s = 6 + m.s * 4; ctx.drawImage(MOTE, m.x - s / 2, m.y - s / 2, s, s);
   }
-  // click ripples
   ctx.lineWidth = 2.5;
   for (const r of rings) { const k = r.t / 0.8; ctx.globalAlpha = (1 - k) * 0.45; ctx.strokeStyle = rgba(lc, 1); ctx.beginPath(); ctx.arc(r.x, r.y, 14 + 170 * (1 - Math.pow(1 - k, 2.2)), 0, TAU); ctx.stroke(); }
-  ctx.globalAlpha = 1;
-  // soft bloom on the brightest petals
-  if (quality >= 1) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const bw = Math.max(2, Math.ceil(cv.width / 8)), bh = Math.max(2, Math.ceil(cv.height / 8));
-    if (bloom.width !== bw || bloom.height !== bh) { bloom.width = bw; bloom.height = bh; }
-    bloomG.globalCompositeOperation = 'source-over'; bloomG.clearRect(0, 0, bw, bh);
-    if (canFilter) bloomG.filter = 'brightness(0.62) contrast(1.7) blur(1.5px)';
-    bloomG.drawImage(cv, 0, 0, bw, bh); bloomG.filter = 'none';
-    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = canFilter ? 0.3 : 0.1; ctx.imageSmoothingEnabled = true; ctx.drawImage(bloom, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1;
-  }
-  // vignette
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const diag = Math.hypot(cv.width, cv.height), vg = ctx.createRadialGradient(cv.width * 0.55, cv.height * 0.45, diag * 0.28, cv.width * 0.5, cv.height * 0.5, diag * 0.74);
-  vg.addColorStop(0, 'rgb(255,255,255)'); vg.addColorStop(1, rgba(mix3([96, 70, 104], [58, 32, 78], d), 1));
-  ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 function drawCursor() {
   sceneT();
@@ -501,43 +550,49 @@ function drawCursor() {
 }
 function render(t) {
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = true;
-  sceneT(); ctx.drawImage(bg, 0, 0, SW, SH);
+  sceneT(); ctx.drawImage(bgBitmap || bg, 0, 0, SW, SH);
   drawLeaves(t); drawFlowers(t); drawParticles(t);
   drawLighting(t); drawCursor();
 }
 
 // ---------------------------------------------------------------- loop & UI
 function resize() {
-  vw = innerWidth; vh = innerHeight; dpr = Math.min(devicePixelRatio || 1, quality <= 0 ? 1 : 2);
+  vw = innerWidth; vh = innerHeight;
+  const budget = quality >= 2 ? 3.4e6 : quality === 1 ? 1.6e6 : 0.8e6;     // device pixels the canvas may use at this tier
+  dpr = clamp(Math.min(devicePixelRatio || 1, 2, Math.sqrt(budget / (vw * vh))), 0.6, 2);
   cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
   scale = Math.max(vw / SW, vh / SH); offX = (vw - SW * scale) / 2; offY = (vh - SH * scale) / 2;
   K = scale * dpr; OX = offX * dpr; OY = offY * dpr;
-  buildBG();
+  vis.x0 = -offX / scale; vis.x1 = (vw - offX) / scale; vis.y0 = -offY / scale; vis.y1 = (vh - offY) / scale;
+  sizeMaps(); buildBG();
+  if (typeof createImageBitmap === 'function') { const token = ++bgToken; bgBitmap = null; createImageBitmap(bg).then((b) => { if (token === bgToken) bgBitmap = b; }).catch(() => {}); }
 }
-addEventListener('resize', resize);
-let last = 0, clock = 0, paused = false;
+function setQuality(q) { if (q === quality) return; quality = q; resize(); }
+let resizeTimer = 0;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 120); });
+let last = 0, clock = 0, paused = false, acc = 0, n = 0, windows = 0, fast = 0, slowRun = 0;
 function frame(ts) {
   requestAnimationFrame(frame);
   if (paused) { last = ts; return; }
-  const dt = clamp((ts - (last || ts)) / 1000, 0.001, 0.033); last = ts;
+  const raw = ts - (last || ts);
+  if (quality === 0 && raw < 30) return;                    // lowest tier renders at ~30 fps and keeps the time it saves
+  last = ts;
+  const dt = clamp(raw / 1000, 0.001, quality === 0 ? 0.05 : 0.033);
   clock += dt; now = clock;
   update(dt, clock); render(clock);
-}
-// adaptive quality: watch real frame pacing and shed the costly layers first
-{ let prev = 0, acc = 0, n = 0, strikes = 0, windows = 0;
-  const watch = (ts) => {
-    requestAnimationFrame(watch);
-    if (prev && !paused) {
-      const d = ts - prev; if (d < 250) { acc += d; n++; }              // long gaps mean a throttled or backgrounded tab, not a slow scene
-      if (n >= 90) {
-        const avg = acc / n; acc = 0; n = 0; windows++;
-        if (windows > 1 && avg > 24) strikes++; else strikes = 0;
-        if (strikes >= 2 && quality > 0) { quality--; strikes = 0; if (quality === 0) resize(); }
-      }
+  // adaptive quality from real frame pacing; gaps over 250 ms mean a throttled or backgrounded tab, not a slow scene
+  if (raw < 250) { acc += raw; n++; slowRun = raw > 50 ? slowRun + 1 : 0; } else slowRun = 0;
+  const drop = () => { setQuality(quality - 1); ceiling = quality; acc = 0; n = 0; windows = 1; fast = 0; slowRun = 0; };
+  if (slowRun >= 8 && quality > 0) { drop(); return; }
+  if (n >= 30) {
+    const avg = acc / n; acc = 0; n = 0; windows++;
+    if (windows > 2) {
+      if (avg > 23 && quality > 0) drop();
+      else if (avg < 18.5 && quality < ceiling) { if (++fast >= 4) { setQuality(quality + 1); fast = 0; windows = 1; } }
+      else fast = 0;
     }
-    prev = ts;
-  };
-  requestAnimationFrame(watch); }
+  }
+}
 document.addEventListener('visibilitychange', () => { paused = document.hidden; });
 function hideHint() { document.getElementById('hint').classList.add('gone'); }
 setTimeout(hideHint, 9000);
@@ -554,11 +609,24 @@ function bench(n = 30) {
   }
   return { updateMs: +(tu / n).toFixed(2), renderMs: +(tr / n).toFixed(2), canvas: cv.width + 'x' + cv.height, dpr, quality };
 }
-window.__petunia = { bench, state, flowers, burst, pointers, get quality() { return quality; }, set quality(v) { quality = v; } };
+window.__petunia = { bench, state, flowers, burst, pointers, get quality() { return quality; }, set quality(v) { ceiling = Math.max(ceiling, v); setQuality(v); } };
 
+// Sprites are drawn thousands of times a frame. ImageBitmaps are immutable GPU/CPU surfaces; drawing from <canvas>
+// elements makes Firefox re-validate the source on every call.
+let bgBitmap = null, bgToken = 0;
+async function freezeSprites() {
+  if (typeof createImageBitmap !== 'function') return;
+  const bm = (c) => createImageBitmap(c);
+  for (const t in PET) for (const l of PET[t]) { l.base = await bm(l.base); l.rim = await bm(l.rim); }
+  for (const t in THR) THR[t] = await bm(THR[t]);
+  AO = await bm(AO); GLOW = await bm(GLOW); POLLEN = await bm(POLLEN); MOTE = await bm(MOTE);
+  const frozen = new Map();
+  for (const [k, c] of leafSprites) frozen.set(c, await bm(c));
+  for (const l of leaves) l.spr = frozen.get(l.spr) || l.spr;
+}
 updateSun(); resize();
 for (let i = 0; i < 40; i++) update(1 / 30, i / 30);   // let the wind settle before the first frame
-requestAnimationFrame(frame);
+freezeSprites().catch(() => {}).then(() => requestAnimationFrame(frame));
 })();
 </script>
 </body>
