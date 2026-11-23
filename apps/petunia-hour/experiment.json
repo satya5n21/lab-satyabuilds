@@ -1,0 +1,30 @@
+{
+  "id": "petunia-hour",
+  "number": 11,
+  "order": 110,
+  "title": "Petunia Hour",
+  "category": "Interactive garden",
+  "description": "A bed of petunias at sunset. Brush the petals, click a flower, and watch the wind and low sun move through them.",
+  "tag": "Interactive scene",
+  "cta": "Touch",
+  "accent": "#ff9ac1",
+  "status": "live",
+  "date": "2026-11-23",
+  "route": "/petunia-hour/",
+  "output": "site",
+  "media": [
+    "canvas2d"
+  ],
+  "input": [
+    "pointer",
+    "touch"
+  ],
+  "capture": {
+    "waitMs": 3500,
+    "hide": [
+      ".hint",
+      ".title",
+      ".panel"
+    ]
+  }
+}

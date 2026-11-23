@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Petunia extractor</title>
+<style>body{margin:0;background:#111;color:#ccc;font:12px monospace}canvas{display:block;max-width:100%}</style>
+<canvas id="c"></canvas>
+<script>
+// Dev-only tool: reads reference.webp, classifies flower colours, finds flower centres, draws an overlay.
+// Result is exposed as window.RESULT (compact arrays) and used to produce site/flowers-data.js.
+const img = new Image();
+img.src = 'reference.webp';
+img.onload = run;
+
+const C = { WHITE: 0, BLUE: 1, PINK: 2, RED: 3, STRIPE: 4 };
+const NAMES = ['white', 'blue', 'pink', 'red', 'stripe'];
+const COL = ['#ffffff', '#4466ff', '#ff3cb4', '#ff2020', '#ffa040'];
+
+function rgb2hsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) {
+    if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return [h, mx ? d / mx : 0, mx];
+}
+
+function run() {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0);
+  const px = g.getImageData(0, 0, W, H).data;
+  window.PX = px; window.W = W; window.H = H;
+  const cls = new Int8Array(W * H).fill(-1);
+
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const [h, s, v] = rgb2hsv(px[i], px[i + 1], px[i + 2]);
+    let c = -1;
+    if (v > 0.62 && s < 0.2) c = C.WHITE;                       // white petals (and the chartreuse throats are fixed up later)
+    else if (h > 215 && h < 275 && s > 0.45 && v > 0.18) c = C.BLUE;
+    else if (h > 310 && h < 342 && s > 0.38 && v > 0.28) c = C.PINK;
+    else if ((h >= 342 || h < 14) && s > 0.45 && v > 0.45) c = C.RED;
+    if (c === C.WHITE && y < 62) c = -1;                         // wall above pots
+    cls[y * W + x] = c;
+  }
+  window.CLS = cls;
+  window.RESULT = detect(W, H, cls);
+  const cx = g;
+  for (const f of window.RESULT.flowers) {
+    cx.strokeStyle = COL[f[3]]; cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(f[0], f[1], f[2], 0, 7); cx.stroke();
+    cx.fillStyle = '#000'; cx.fillRect(f[0] - 2, f[1] - 2, 4, 4);
+  }
+  window.OUT = buildOutput(W, H, cls, window.RESULT.flowers);
+  document.title = 'done ' + window.RESULT.flowers.length;
+}
+
+// Gap colours (what shows between flowers) as a coarse grid + leaf positions sampled from the green pixels.
+function buildOutput(W, H, cls, flowers) {
+  const CELL = 24, GW = Math.ceil(W / CELL), GH = Math.ceil(H / CELL);
+  const covered = new Uint8Array(W * H);
+  for (const f of flowers) { const r = f[2] * 1.05; for (let y = Math.max(0, f[1] - r | 0); y < Math.min(H, f[1] + r); y++) for (let x = Math.max(0, f[0] - r | 0); x < Math.min(W, f[0] + r); x++) { const dx = x - f[0], dy = y - f[1]; if (dx * dx + dy * dy < r * r) covered[y * W + x] = 1; } }
+  const bytes = new Uint8Array(GW * GH * 3);
+  for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+    let a = [0, 0, 0], n = 0, b = [0, 0, 0], m = 0;
+    for (let y = gy * CELL; y < Math.min(H, (gy + 1) * CELL); y += 2) for (let x = gx * CELL; x < Math.min(W, (gx + 1) * CELL); x += 2) {
+      const i = y * W + x, k = i * 4;
+      b[0] += PX[k]; b[1] += PX[k + 1]; b[2] += PX[k + 2]; m++;
+      if (cls[i] < 0 && !covered[i]) { a[0] += PX[k]; a[1] += PX[k + 1]; a[2] += PX[k + 2]; n++; }
+    }
+    const src = n > 6 ? a : b, cnt = n > 6 ? n : m;
+    const o = (gy * GW + gx) * 3;
+    // slightly darken cells that are mostly covered by flowers so the gaps read as deep shade
+    const dark = n > 6 ? 1 : 0.55;
+    for (let c = 0; c < 3; c++) bytes[o + c] = Math.round(src[c] / cnt * dark);
+  }
+  let bin = ''; for (const v of bytes) bin += String.fromCharCode(v);
+  const leaves = [];
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let y = 10; y < H - 6; y += 17) for (let x = 10; x < W - 6; x += 17) {
+    const X = Math.round(x + (rnd() - 0.5) * 12), Y = Math.round(y + (rnd() - 0.5) * 12);
+    const i = (Y * W + X) * 4;
+    const [h, sat, v] = rgb2hsv(PX[i], PX[i + 1], PX[i + 2]);
+    if (cls[Y * W + X] < 0 && h > 55 && h < 165 && sat > 0.28 && v > 0.14 && Y > 95) leaves.push([X, Y, PX[i], PX[i + 1], PX[i + 2]]);
+  }
+  return { W, H, cell: CELL, gw: GW, gh: GH, base: btoa(bin), flowers, leaves };
+}
+
+function boxBlur(src, W, H, r) {
+  // separable box blur on Float32Array
+  const tmp = new Float32Array(W * H), out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) { let a = 0; for (let x = -r; x <= r; x++) a += src[y * W + Math.min(W - 1, Math.max(0, x))];
+    for (let x = 0; x < W; x++) { tmp[y * W + x] = a / (2 * r + 1); a += src[y * W + Math.min(W - 1, x + r + 1)] - src[y * W + Math.max(0, x - r)]; } }
+  for (let x = 0; x < W; x++) { let a = 0; for (let y = -r; y <= r; y++) a += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
+    for (let y = 0; y < H; y++) { out[y * W + x] = a / (2 * r + 1); a += tmp[Math.min(H - 1, y + r + 1) * W + x] - tmp[Math.max(0, y - r) * W + x]; } }
+  return out;
+}
+
+function detect(W, H, cls) {
+  const flowers = [];
+  // Flower-colour "any" mask closed over small holes (throats, veins) by blurring then thresholding.
+  const anyMask = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) anyMask[i] = cls[i] >= 0 ? 1 : 0;
+  const closed = boxBlur(boxBlur(anyMask, W, H, 5), W, H, 5);
+  const solid = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) solid[i] = closed[i] > 0.38 ? 1 : 0;
+  window.SOLID = solid;
+  // distance transform (chamfer) on solid
+  const D = new Float32Array(W * H);
+  const INF = 1e9;
+  for (let i = 0; i < W * H; i++) D[i] = solid[i] ? INF : 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (!D[i]) continue;
+    let m = D[i];
+    if (x > 0) m = Math.min(m, D[i - 1] + 1);
+    if (y > 0) { m = Math.min(m, D[i - W] + 1); if (x > 0) m = Math.min(m, D[i - W - 1] + 1.414); if (x < W - 1) m = Math.min(m, D[i - W + 1] + 1.414); }
+    D[i] = m; }
+  for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; if (!D[i]) continue;
+    let m = D[i];
+    if (x < W - 1) m = Math.min(m, D[i + 1] + 1);
+    if (y < H - 1) { m = Math.min(m, D[i + W] + 1); if (x < W - 1) m = Math.min(m, D[i + W + 1] + 1.414); if (x > 0) m = Math.min(m, D[i + W - 1] + 1.414); }
+    D[i] = m; }
+  const Ds = boxBlur(D, W, H, 3);
+  window.DT = Ds;
+  // Greedy peak picking: biggest distance first, suppress neighbours within 0.9 * r.
+  const cand = [];
+  for (let y = 4; y < H - 4; y += 2) for (let x = 4; x < W - 4; x += 2) { const d = Ds[y * W + x]; if (d > 13) cand.push([x, y, d]); }
+  cand.sort((a, b) => b[2] - a[2]);
+  const kept = [];
+  for (const [x, y, d] of cand) {
+    const r = Math.min(d, 58);
+    let ok = true;
+    for (const k of kept) { const dx = k[0] - x, dy = k[1] - y; const lim = Math.max(r, k[2]) * 1.08; if (dx * dx + dy * dy < lim * lim) { ok = false; break; } }
+    if (ok) kept.push([x, y, r]);
+  }
+  const POTS = [[30,40,205,75],[256,40,445,105],[515,40,700,98],[772,40,960,112],[985,50,1190,112],[1228,50,1280,102]];
+  for (const [x, y, r] of kept) {
+    if (POTS.some(p => x > p[0] && x < p[2] && y > p[1] && y < p[3])) continue;
+    // colour vote in a disc of radius r
+    const votes = [0, 0, 0, 0, 0]; let wh = 0, rd = 0;
+    for (let yy = -r | 0; yy <= r; yy += 2) for (let xx = -r | 0; xx <= r; xx += 2) {
+      if (xx * xx + yy * yy > r * r) continue;
+      const X = (x + xx) | 0, Y = (y + yy) | 0; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+      const c = cls[Y * W + X]; if (c >= 0) votes[c]++;
+    }
+    let best = 0; for (let k = 1; k < 5; k++) if (votes[k] > votes[best]) best = k;
+    // red with a lot of white mixed in = striped petunia
+    if ((best === C.RED && votes[C.WHITE] > votes[C.RED] * 0.28) || (best === C.WHITE && votes[C.RED] > votes[C.WHITE] * 0.45)) best = C.STRIPE;
+    flowers.push([Math.round(x), Math.round(y), Math.round(r), best]);
+  }
+  return { flowers };
+}
+</script>

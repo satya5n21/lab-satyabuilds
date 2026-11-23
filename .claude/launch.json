@@ -14,6 +14,18 @@
       "port": 5190
     },
     {
+      "name": "petunia-hour",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:petunia-hour"],
+      "port": 5191
+    },
+    {
+      "name": "packet-panic",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:packet-panic"],
+      "port": 5179
+    },
+    {
       "name": "the-stars-remain",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:the-stars-remain"],
