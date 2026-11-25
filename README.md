@@ -13,6 +13,7 @@ A small monorepo for independent web experiments.
 - `starship-success`: Chopstick Catch, a standalone HTML booster-catch game.
 - `production-panic`: React, TypeScript, and Vite.
 - `packet-panic`: React, TypeScript, Vite, and Tailwind (infrastructure scaling simulator).
+- `black-hole-playground`: React, TypeScript, Vite, and Canvas 2D (gravitational sandbox with a lensed starfield).
 - `petunia-hour`: standalone HTML and Canvas 2D, a petunia bed at sunset you can touch.
 - `the-stars-remain`: React, TypeScript, Vite, and Three.js.
 - `VERYA-planet-of-living-light`: React, TypeScript, Vite, Tailwind, and Three.js (VEYRA, an alien world).
@@ -42,6 +43,7 @@ npm run dev:starship-success
 npm run dev:production-panic
 npm run dev:packet-panic
 npm run dev:petunia-hour
+npm run dev:black-hole-playground
 npm run dev:the-stars-remain
 npm run dev:verya-planet-of-living-light
 ```

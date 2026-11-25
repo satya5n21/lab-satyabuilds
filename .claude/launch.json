@@ -20,6 +20,12 @@
       "port": 5191
     },
     {
+      "name": "black-hole-playground",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:black-hole-playground"],
+      "port": 5192
+    },
+    {
       "name": "packet-panic",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:packet-panic"],

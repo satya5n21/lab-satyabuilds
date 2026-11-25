@@ -1,0 +1,26 @@
+{
+  "id": "black-hole-playground",
+  "number": 12,
+  "order": 120,
+  "title": "Black Hole Playground",
+  "category": "Gravity sandbox",
+  "description": "Tune a black hole's gravity, drop stars into its pull and watch matter orbit, accelerate and fall past the event horizon while the starfield bends around it.",
+  "tag": "Physics sandbox",
+  "cta": "Explore",
+  "accent": "#8fa2ff",
+  "status": "live",
+  "date": "2026-11-25",
+  "route": "/black-hole-playground/",
+  "output": "dist",
+  "media": [
+    "canvas2d"
+  ],
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "capture": {
+    "waitMs": 4500,
+    "hide": [".panel", ".hud", ".hint", ".ui-toggle"]
+  }
+}
