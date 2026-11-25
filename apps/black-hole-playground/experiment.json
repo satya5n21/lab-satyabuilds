@@ -21,6 +21,6 @@
   ],
   "capture": {
     "waitMs": 4500,
-    "hide": [".panel", ".hud", ".hint", ".ui-toggle"]
+    "hide": [".panel", ".hud", ".hint", ".ui-toggle", ".compare-btn"]
   }
 }

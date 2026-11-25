@@ -455,6 +455,86 @@ button:focus-visible {
   color: var(--text);
 }
 
+/* compare link, bottom-left under the readout */
+
+.has-compare .hud {
+  bottom: 74px;
+}
+
+.compare-btn {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--muted);
+  text-decoration: none;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 10px 40px rgba(0, 0, 8, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.45s ease, transform 0.45s ease;
+  animation: rise 0.9s 0.3s both cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.compare-btn:hover,
+.compare-btn:focus-visible {
+  color: var(--text);
+  border-color: rgba(94, 231, 255, 0.5);
+  box-shadow: 0 0 0 4px rgba(94, 231, 255, 0.1), 0 0 22px rgba(94, 231, 255, 0.28);
+}
+
+.compare-btn:focus-visible {
+  outline: none;
+}
+
+.compare-tip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(9, 11, 26, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-6px, -50%);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.compare-btn:hover .compare-tip,
+.compare-btn:focus-visible .compare-tip {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.ui-hidden .compare-btn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .hint {
   position: absolute;
   left: 50%;
@@ -542,6 +622,16 @@ button:focus-visible {
 
   .ui-toggle,
   .hint {
+    display: none;
+  }
+
+  .compare-btn {
+    left: 12px;
+    bottom: 68px;
+    z-index: 1;
+  }
+
+  .compare-tip {
     display: none;
   }
 }

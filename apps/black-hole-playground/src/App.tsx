@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ControlPanel } from './components/ControlPanel';
-import { EyeOffIcon, Mark } from './components/Icons';
+import { CompareIcon, EyeOffIcon, Mark } from './components/Icons';
 import { Hud } from './components/Hud';
 import { SimCanvas } from './components/SimCanvas';
 import { DEFAULT_PARAMS, type HudStats, type SimParams } from './sim/config';
+
+/** True when shown inside the compare page, which already offers the way back. */
+const embedded = window.self !== window.top;
 
 export default function App() {
   const [params, setParams] = useState<SimParams>(DEFAULT_PARAMS);
@@ -51,7 +54,7 @@ export default function App() {
   }, [reset]);
 
   return (
-    <div className={`app ${uiHidden ? 'ui-hidden' : ''}`}>
+    <div className={`app ${uiHidden ? 'ui-hidden' : ''} ${embedded ? '' : 'has-compare'}`}>
       <SimCanvas params={params} resetToken={resetToken} onStats={setStats} onSpawn={handleSpawn} />
       <div className="vignette" aria-hidden />
 
@@ -72,6 +75,16 @@ export default function App() {
         onChange={change}
         onReset={reset}
       />
+
+      {!embedded && (
+        <a className="compare-btn" href={`${import.meta.env.BASE_URL}compare.html`} aria-describedby="compare-tip">
+          <CompareIcon />
+          <span id="compare-tip" role="tooltip" className="compare-tip">
+            Compare it with Gemini Neon result
+          </span>
+          <span className="sr-only">Compare it with Gemini Neon result</span>
+        </a>
+      )}
 
       <button
         className="ui-toggle"

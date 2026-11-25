@@ -24,6 +24,20 @@ npm run build:black-hole-playground
 | Reset | `R`: clears the scene and restores the default settings |
 | `H` | Hide the interface |
 
+## Compare with Gemini Neon
+
+The round button at the bottom-left (tooltip: "Compare it with Gemini Neon result") opens
+`/black-hole-playground/compare.html`. It shows this build on the left and Gemini Neon's answer to
+the same prompt on the right, in two iframes, so both are live and playable at once. Each side has an
+Enlarge button that expands it over the whole stage (Restore or `Esc` goes back); the other side keeps
+running underneath.
+
+Gemini's code lives untouched in `src/gemini/BlackHolePlayground.tsx` and is served as its own page,
+`gemini.html`, because it was written against Tailwind, `lucide-react` and a full-window layout.
+Its Tailwind stylesheet is compiled ahead of time into `src/gemini/gemini.css` (committed), so there is
+no PostCSS step and nothing leaks into the rest of the app. If you change files in `src/gemini`, run
+`npm run build:gemini-css --workspace=black-hole-playground`.
+
 ## The model
 
 Particles move under the Paczynski-Wiita pseudo-Newtonian force, `a = GM / (r - rs)^2` with

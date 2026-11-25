@@ -1,0 +1,16 @@
+/*
+  Source for gemini.css. Gemini's version is written with Tailwind utility classes, so its stylesheet
+  is compiled ahead of time and committed (npm run build:gemini-css --workspace=black-hole-playground).
+  That keeps the page styled without any PostCSS step in Vite. Re-run it if src/gemini changes.
+*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #02040b;
+}

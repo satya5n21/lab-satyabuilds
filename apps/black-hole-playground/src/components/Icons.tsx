@@ -46,6 +46,13 @@ export const EyeOffIcon = () => (
   </svg>
 );
 
+export const CompareIcon = () => (
+  <svg {...base} width={17} height={17}>
+    <rect x="3" y="4" width="8" height="16" rx="2" />
+    <rect x="13" y="4" width="8" height="16" rx="2" />
+  </svg>
+);
+
 export const Mark = () => (
   <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden>
     <defs>

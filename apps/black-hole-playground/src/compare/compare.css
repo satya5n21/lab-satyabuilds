@@ -1,0 +1,259 @@
+:root {
+  color-scheme: dark;
+  --bg: #03040a;
+  --text: #e8ecff;
+  --muted: #8d95bd;
+  --faint: #596087;
+  --cyan: #5ee7ff;
+  --violet: #a78bfa;
+  --line: rgba(166, 182, 255, 0.14);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.cmp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------- top bar ---------- */
+
+.cmp-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 52px;
+  flex: none;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(9, 11, 26, 0.7);
+}
+
+.cmp-bar h1 {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--cyan), var(--violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+
+.cmp-bar p {
+  margin: 0 0 0 auto;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.cmp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.cmp-back:hover {
+  color: var(--text);
+  border-color: rgba(166, 182, 255, 0.35);
+  background: rgba(166, 182, 255, 0.08);
+}
+
+/* ---------- panes ---------- */
+
+.cmp-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+}
+
+.cmp-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.cmp-pane iframe {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--bg);
+}
+
+.cmp-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  flex: none;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  background: rgba(9, 11, 26, 0.55);
+}
+
+.cmp-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  transition: background 0.25s, box-shadow 0.25s;
+}
+
+.cmp-pane.is-focused .cmp-badge {
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+.cmp-sub {
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.cmp-enlarge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(166, 182, 255, 0.06);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.cmp-enlarge:hover {
+  background: rgba(166, 182, 255, 0.14);
+  border-color: rgba(166, 182, 255, 0.32);
+}
+
+.cmp-enlarge:focus-visible,
+.cmp-back:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* An enlarged pane covers the whole stage; the other keeps running underneath at its old size. */
+
+.cmp-pane.is-enlarged {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+
+.cmp-pane.claude.is-enlarged {
+  animation: reveal-left 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.cmp-pane.gemini.is-enlarged {
+  animation: reveal-right 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes reveal-left {
+  from {
+    clip-path: inset(0 50% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes reveal-right {
+  from {
+    clip-path: inset(0 0 0 50%);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@media (max-width: 719px) {
+  .cmp-bar p {
+    display: none;
+  }
+
+  .cmp-bar h1 {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+  }
+
+  .cmp-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .cmp-pane.claude.is-enlarged {
+    animation-name: reveal-top;
+  }
+
+  .cmp-pane.gemini.is-enlarged {
+    animation-name: reveal-bottom;
+  }
+
+  @keyframes reveal-top {
+    from {
+      clip-path: inset(0 0 50% 0);
+    }
+    to {
+      clip-path: inset(0);
+    }
+  }
+
+  @keyframes reveal-bottom {
+    from {
+      clip-path: inset(50% 0 0 0);
+    }
+    to {
+      clip-path: inset(0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
