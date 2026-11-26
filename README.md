@@ -15,6 +15,7 @@ A small monorepo for independent web experiments.
 - `packet-panic`: React, TypeScript, Vite, and Tailwind (infrastructure scaling simulator).
 - `black-hole-playground`: React, TypeScript, Vite, and Canvas 2D (gravitational sandbox with a lensed starfield).
 - `petunia-hour`: standalone HTML and Canvas 2D, a petunia bed at sunset you can touch.
+- `counting-friends`: standalone HTML and Canvas 2D, an X follower counter made of particles on a starry sky.
 - `the-stars-remain`: React, TypeScript, Vite, and Three.js.
 - `VERYA-planet-of-living-light`: React, TypeScript, Vite, Tailwind, and Three.js (VEYRA, an alien world).
 
@@ -43,6 +44,7 @@ npm run dev:starship-success
 npm run dev:production-panic
 npm run dev:packet-panic
 npm run dev:petunia-hour
+npm run dev:counting-friends
 npm run dev:black-hole-playground
 npm run dev:the-stars-remain
 npm run dev:verya-planet-of-living-light
@@ -67,7 +69,7 @@ npm run deploy
 The combined site is assembled in `deployment/public`. The homepage is at `/`,
 the Dyson Sphere app is at `/dyson-sphere/`, and the music visualizer is at
 `/cosmo-music-visualizer/`. Pelagic is at `/pelagic/`, and Production Panic is
-at `/production-panic/`. Packet Panic is at `/packet-panic/`. Petunia Hour is at `/petunia-hour/`. The Stars Remain is at `/the-stars-remain/`, and the Cosmic Timeline is at
+at `/production-panic/`. Packet Panic is at `/packet-panic/`. Petunia Hour is at `/petunia-hour/`. Counting Friends is at `/counting-friends/`. The Stars Remain is at `/the-stars-remain/`, and the Cosmic Timeline is at
 `/cosmic-timeline-btn/`. VEYRA is at `/verya-planet-of-living-light/`, and Chopstick Catch is at `/starship-success/`.
 `wrangler.jsonc` points Cloudflare Wrangler at that assembled directory.
 

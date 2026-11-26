@@ -1,0 +1,28 @@
+{
+  "id": "counting-friends",
+  "number": 13,
+  "order": 130,
+  "title": "Counting Friends",
+  "category": "Particle counter",
+  "description": "My X follower count, written in thousands of particles on a starry sky. Drag through it and the wind scatters the digits; let go and they drift home.",
+  "tag": "Interactive counter",
+  "cta": "Blow",
+  "accent": "#9fd4ff",
+  "status": "live",
+  "date": "2026-11-26",
+  "route": "/counting-friends/",
+  "output": "site",
+  "media": [
+    "canvas2d"
+  ],
+  "input": [
+    "pointer",
+    "touch"
+  ],
+  "capture": {
+    "waitMs": 4500,
+    "hide": [
+      ".bar"
+    ]
+  }
+}

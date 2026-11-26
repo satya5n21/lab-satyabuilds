@@ -16,6 +16,7 @@
         "dev:cosmo-music-visualizer": "npm run dev --workspace=cosmos-music-visualizer-argon",
         "dev:dyson-sphere": "vite apps/dyson-sphere/site --host 127.0.0.1 --port 5174",
         "dev:petunia-hour": "vite apps/petunia-hour/site --host 127.0.0.1 --port 5191",
+        "dev:counting-friends": "vite apps/counting-friends/site --host 127.0.0.1 --port 5193",
         "dev:pelagic": "vite apps/pelagic/site --host 127.0.0.1 --port 5177",
         "dev:starship-success": "vite apps/starship-success/site --host 127.0.0.1 --port 5178",
         "dev:production-panic": "npm run dev --workspace=production-panic",

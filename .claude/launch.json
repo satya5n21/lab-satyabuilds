@@ -4,38 +4,68 @@
     {
       "name": "hub",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/dev-hub.mjs"],
+      "runtimeArgs": [
+        "scripts/dev-hub.mjs"
+      ],
       "port": 5175
     },
     {
       "name": "dyson-wallpaper",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "apps/dyson-sphere/wallpaper", "--host", "127.0.0.1", "--port", "5190"],
+      "runtimeArgs": [
+        "vite",
+        "apps/dyson-sphere/wallpaper",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5190"
+      ],
       "port": 5190
     },
     {
       "name": "petunia-hour",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:petunia-hour"],
+      "runtimeArgs": [
+        "run",
+        "dev:petunia-hour"
+      ],
       "port": 5191
     },
     {
       "name": "black-hole-playground",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:black-hole-playground"],
+      "runtimeArgs": [
+        "run",
+        "dev:black-hole-playground"
+      ],
       "port": 5192
     },
     {
       "name": "packet-panic",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:packet-panic"],
+      "runtimeArgs": [
+        "run",
+        "dev:packet-panic"
+      ],
       "port": 5179
     },
     {
       "name": "the-stars-remain",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:the-stars-remain"],
+      "runtimeArgs": [
+        "run",
+        "dev:the-stars-remain"
+      ],
       "port": 5178
+    },
+    {
+      "name": "counting-friends",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:counting-friends"
+      ],
+      "port": 5193
     }
   ]
 }

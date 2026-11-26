@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Counting Friends</title>
+  <meta name="description" content="@satya5n21's X follower count, drawn in particles on a starry sky. Drag to blow them around." />
+  <meta name="theme-color" content="#04060f" />
+  <style>
+    :root {
+      --bg: #04060f;
+      --ink-soft: rgba(205, 218, 255, 0.55);
+      --ink-faint: rgba(205, 218, 255, 0.32);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink-soft);
+      -webkit-font-smoothing: antialiased;
+    }
+    canvas {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      display: block; touch-action: none; cursor: grab;
+    }
+    canvas.dragging { cursor: grabbing; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    .bar {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      font-size: 13px; letter-spacing: 0.04em; pointer-events: none;
+    }
+    .hint { color: var(--ink-faint); transition: opacity 1.2s ease; }
+    .hint.gone { opacity: 0; }
+    .bar a {
+      pointer-events: auto; color: var(--ink-soft); text-decoration: none;
+      border-bottom: 1px solid transparent; transition: color .2s, border-color .2s;
+    }
+    .bar a:hover, .bar a:focus-visible { color: #e8eeff; border-color: currentColor; outline: none; }
+  </style>
+</head>
+<body>
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <h1 class="sr-only" id="readout" aria-live="polite">@satya5n21: 1,000 friends</h1>
+  <div class="bar">
+    <span class="hint" id="hint">Press and drag to blow the particles away</span>
+    <a id="profile" href="https://x.com/satya5n21" target="_blank" rel="noopener">x.com/satya5n21</a>
+  </div>
+  <script src="./config.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>
