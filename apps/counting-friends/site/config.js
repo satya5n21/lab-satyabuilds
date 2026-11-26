@@ -12,6 +12,11 @@
 window.COUNTING_FRIENDS = {
   handle: 'satya5n21',
   label: 'friends',
+  // Show the label line under the number. Set to false to show only the handle and the number.
+  showLabel: true,
+  // Pixels between particle centres in the big number. Higher means fewer, more spread-out
+  // particles. Phones use 75% of this, and very large numbers widen it to stay smooth.
+  particleSpacing: 6,
   fallbackCount: 1000,
   apiUrl: '',
   // How often an open page asks the endpoint again. The endpoint itself decides how often X is called.

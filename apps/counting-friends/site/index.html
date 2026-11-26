@@ -41,10 +41,55 @@
       border-bottom: 1px solid transparent; transition: color .2s, border-color .2s;
     }
     .bar a:hover, .bar a:focus-visible { color: #e8eeff; border-color: currentColor; outline: none; }
+
+    .density {
+      position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 12px;
+      width: min(360px, calc(100% - 32px));
+      padding: 10px 16px; border-radius: 999px;
+      background: rgba(12, 16, 38, 0.55);
+      border: 1px solid rgba(170, 190, 255, 0.14);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      font-size: 12px; letter-spacing: 0.05em; color: var(--ink-soft);
+      user-select: none; -webkit-user-select: none;
+    }
+    .density label { white-space: nowrap; }
+    .density output {
+      min-width: 3.6em; text-align: right; color: #dfe8ff;
+      font-variant-numeric: tabular-nums;
+    }
+    .density input[type="range"] {
+      flex: 1; min-width: 0; margin: 0; height: 22px; background: transparent;
+      -webkit-appearance: none; appearance: none; cursor: pointer;
+    }
+    .density input[type="range"]::-webkit-slider-runnable-track {
+      height: 3px; border-radius: 3px;
+      background: linear-gradient(90deg, rgba(159, 212, 255, 0.25), rgba(203, 185, 255, 0.7));
+    }
+    .density input[type="range"]::-moz-range-track {
+      height: 3px; border-radius: 3px;
+      background: linear-gradient(90deg, rgba(159, 212, 255, 0.25), rgba(203, 185, 255, 0.7));
+    }
+    .density input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 14px; height: 14px; margin-top: -5.5px; border-radius: 50%;
+      background: #eef3ff; box-shadow: 0 0 10px rgba(180, 205, 255, 0.8);
+    }
+    .density input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px; border: 0; border-radius: 50%;
+      background: #eef3ff; box-shadow: 0 0 10px rgba(180, 205, 255, 0.8);
+    }
+    .density input[type="range"]:focus-visible { outline: none; }
+    .density input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(159, 212, 255, 0.45); }
   </style>
 </head>
 <body>
   <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="density">
+    <label for="density">Particles</label>
+    <input id="density" type="range" min="3" max="14" step="0.5" value="11" aria-describedby="density-out" />
+    <output id="density-out" for="density" aria-live="off">0</output>
+  </div>
   <h1 class="sr-only" id="readout" aria-live="polite">@satya5n21: 1,000 friends</h1>
   <div class="bar">
     <span class="hint" id="hint">Press and drag to blow the particles away</span>

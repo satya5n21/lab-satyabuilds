@@ -6,7 +6,7 @@
   'use strict';
 
   const CFG = Object.assign(
-    { handle: 'satya5n21', label: 'friends', fallbackCount: 1000, apiUrl: '', refreshHours: 12, requestTimeoutMs: 8000 },
+    { handle: 'satya5n21', label: 'friends', showLabel: true, particleSpacing: 6, fallbackCount: 1000, apiUrl: '', refreshHours: 12, requestTimeoutMs: 8000 },
     window.COUNTING_FRIENDS || {}
   );
   const CACHE_KEY = 'counting-friends:last-count';
@@ -25,6 +25,12 @@
   let stars = [];
   let particles = [];
   let count = initialCount();
+
+  // Number density. The slider reads "more particles" to the right, which is a smaller spacing.
+  const SPACING_MIN = 3, SPACING_MAX = 14;
+  const SPACING_KEY = 'counting-friends:number-spacing';
+  let numberSpacing = initialSpacing();
+  let numberParticleCount = 0;
   let shooting = null, nextShootAt = performance.now() + 4000;
 
   // Particle colours. 0 handle, 1-3 number (dithered left to right), 4 label, 5 fast-moving.
@@ -50,6 +56,18 @@
       } catch (_) { /* storage blocked: fall through */ }
     }
     return validCount(Number(CFG.fallbackCount)) ?? 1000;
+  }
+
+  function clampSpacing(v) {
+    return Math.min(SPACING_MAX, Math.max(SPACING_MIN, v));
+  }
+
+  function initialSpacing() {
+    try {
+      const saved = Number(localStorage.getItem(SPACING_KEY));
+      if (localStorage.getItem(SPACING_KEY) !== null && Number.isFinite(saved)) return clampSpacing(saved);
+    } catch (_) { /* storage blocked */ }
+    return clampSpacing(Number(CFG.particleSpacing) || 6);
   }
 
   function pickCount(json) {
@@ -263,11 +281,14 @@
     const handleSize = Math.max(narrow ? 21 : 17, Math.min(56, numSize * (narrow ? 0.22 : 0.17)));
     const labelSize = Math.max(narrow ? 34 : 24, Math.min(120, numSize * (narrow ? 0.38 : 0.3)));
 
+    const showLabel = CFG.showLabel !== false && String(labelText || '').trim() !== '';
     const lines = [
-      { text: handleText, font: `600 ${handleSize}px ${FONT}`, size: handleSize, channel: 0, spacing: '0.02em' },
-      { text: numText, font: `800 ${numSize}px ${FONT}`, size: numSize, channel: 1, spacing: '0em' },
-      { text: labelText, font: `700 ${labelSize}px ${FONT}`, size: labelSize, channel: 2, spacing: '0.08em' },
+      { text: handleText, font: `600 ${handleSize}px ${FONT}`, size: handleSize, channel: 0, spacing: '0.02em', gapAfter: numSize * 0.16 },
+      { text: numText, font: `800 ${numSize}px ${FONT}`, size: numSize, channel: 1, spacing: '0em', gapAfter: numSize * 0.12 },
     ];
+    if (showLabel) {
+      lines.push({ text: labelText, font: `700 ${labelSize}px ${FONT}`, size: labelSize, channel: 2, spacing: '0.08em', gapAfter: 0 });
+    }
     for (const l of lines) {
       o.font = l.font;
       if ('letterSpacing' in o) o.letterSpacing = l.spacing;
@@ -275,8 +296,7 @@
       l.asc = m.actualBoundingBoxAscent || l.size * 0.72;
       l.desc = m.actualBoundingBoxDescent || l.size * 0.05;
     }
-    const gap1 = numSize * 0.16, gap2 = numSize * 0.12;
-    const total = lines[0].asc + lines[0].desc + gap1 + lines[1].asc + lines[1].desc + gap2 + lines[2].asc + lines[2].desc;
+    const total = lines.reduce((sum, l, i) => sum + l.asc + l.desc + (i < lines.length - 1 ? l.gapAfter : 0), 0);
     let y = (H - total) / 2 - H * 0.02;
     const fills = ['#ff0000', '#00ff00', '#0000ff'];
     for (let i = 0; i < lines.length; i++) {
@@ -287,36 +307,34 @@
       o.fillText(l.text, W / 2, y + l.asc);
       l.top = y;
       l.bottom = y + l.asc + l.desc;
-      y = l.bottom + (i === 0 ? gap1 : gap2);
+      y = l.bottom + l.gapAfter;
     }
 
     const img = o.getImageData(0, 0, off.width, off.height).data;
     const w = off.width;
 
-    // Pick a sampling step per line: small text needs a fine step to stay legible, and the
-    // total is capped so phones and huge screens both stay smooth.
-    const maxParticles = W < 700 ? 4200 : W > 1800 ? 11000 : 8500;
-    const coverage = [0, 0, 0];
+    // Sampling step per line. The handle is always sampled densely so it reads clearly. The
+    // number uses the slider's spacing (pixels between particle centres), widened only if it
+    // would pass a safety cap. The label follows the number but never gets coarser than it needs.
+    const maxNumberParticles = W < 700 ? 4000 : W > 1800 ? 12000 : 9000;
+    let numberCoverage = 0;
     for (let py = 0; py < off.height; py += 2) {
       for (let px = 0; px < w; px += 2) {
-        const i = (py * w + px) * 4;
-        if (img[i] > 128) coverage[0]++; else if (img[i + 1] > 128) coverage[1]++; else if (img[i + 2] > 128) coverage[2]++;
+        if (img[(py * w + px) * 4 + 1] > 128) numberCoverage++;
       }
     }
-    const estimate = (steps) => coverage.reduce((sum, c, k) => sum + (c * 4) / (steps[k] * steps[k]), 0);
-    let base = 2.6;
-    const stepsFor = (b) => [
-      Math.max(1.6, Math.min(b, handleSize / 9)),
-      b,
-      Math.max(2, Math.min(b, labelSize / 10)),
+    let base = numberSpacing;
+    while ((numberCoverage * 4) / (base * base) > maxNumberParticles && base < SPACING_MAX) base += 0.25;
+    const steps = [
+      Math.max(1.4, Math.min(2.4, handleSize / 13)),
+      base,
+      Math.max(2.6, Math.min(base, labelSize / 8)),
     ];
-    while (estimate(stepsFor(base)) > maxParticles && base < 14) base += 0.25;
-    const steps = stepsFor(base);
 
     const pts = [];
-    for (let k = 0; k < 3; k++) {
+    for (const l of lines) {
+      const k = l.channel;
       const st = steps[k];
-      const l = lines[k];
       const y0 = Math.max(0, Math.floor(l.top - 2)), y1 = Math.min(off.height - 1, Math.ceil(l.bottom + 2));
       for (let fy = y0; fy <= y1; fy += st) {
         const py = Math.round(fy);
@@ -324,8 +342,9 @@
           const px = Math.round(fx);
           const v = img[(py * w + px) * 4 + k];
           if (v <= 128) continue;
-          const jx = (Math.random() - 0.5) * st * 0.35;
-          const jy = (Math.random() - 0.5) * st * 0.35;
+          const jit = k === 0 ? 0.15 : 0.35;
+          const jx = (Math.random() - 0.5) * st * jit;
+          const jy = (Math.random() - 0.5) * st * jit;
           let c;
           if (k === 0) c = 0;
           else if (k === 2) c = 4;
@@ -335,10 +354,14 @@
             c = p < 0.38 ? 1 : p < 0.62 ? 2 : 3;
             if (Math.random() < 0.22) c = 2;
           }
-          pts.push({ x: px + jx, y: py + jy, c, s: st * rand(0.55, 0.8) });
+          // Handle dots nearly touch so the small text stays solid; the others leave sky between them.
+          const s = k === 0 ? Math.max(1.1, st * rand(0.7, 0.85)) : Math.min(3.2, st * rand(0.36, 0.5));
+          pts.push({ x: px + jx, y: py + jy, c, s, line: k });
         }
       }
     }
+    numberParticleCount = pts.reduce((n, p) => n + (p.line === 1 ? 1 : 0), 0);
+    showDensity();
     return pts;
   }
 
@@ -539,12 +562,38 @@
     resizeTimer = setTimeout(resize, 150);
   });
 
+  // ---------- density slider ----------
+
+  const density = document.getElementById('density');
+  const densityOut = document.getElementById('density-out');
+
+  function showDensity() {
+    densityOut.textContent = numberParticleCount.toLocaleString('en-US');
+  }
+
+  function initSlider() {
+    density.min = String(SPACING_MIN);
+    density.max = String(SPACING_MAX);
+    density.step = '0.5';
+    density.value = String(SPACING_MIN + SPACING_MAX - numberSpacing);
+    let timer = 0;
+    density.addEventListener('input', () => {
+      numberSpacing = clampSpacing(SPACING_MIN + SPACING_MAX - Number(density.value));
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setTargets(buildTargets());
+        try { localStorage.setItem(SPACING_KEY, String(numberSpacing)); } catch (_) {}
+      }, 60);
+    });
+  }
+
   async function start() {
     profile.href = 'https://x.com/' + encodeURIComponent(CFG.handle);
     profile.textContent = 'x.com/' + CFG.handle;
     if (window.matchMedia('(pointer: coarse)').matches) hint.textContent = 'Touch and drag to blow the particles away';
     updateReadout();
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (_) {} }
+    initSlider();
     resize();
     requestAnimationFrame((t) => { last = t; frame(t); });
     if (CFG.apiUrl) {

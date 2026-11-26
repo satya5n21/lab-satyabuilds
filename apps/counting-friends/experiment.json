@@ -22,6 +22,7 @@
   "capture": {
     "waitMs": 4500,
     "hide": [
+      ".density",
       ".bar"
     ]
   }

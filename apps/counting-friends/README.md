@@ -21,7 +21,12 @@ Opens `site/index.html` on http://127.0.0.1:5193. Add `?count=1234` to the URL t
 
 ## Where the number comes from
 
-Settings live in `site/config.js`.
+Settings live in `site/config.js`. Two of them change the look:
+
+- `showLabel`: `true` shows the "friends" line under the number, `false` hides it.
+- `particleSpacing`: the starting pixels between particles in the number (default `6`). The
+  **Particles** slider at the top of the page changes it live (3 to 14 px; right means more particles)
+  and each browser remembers its last setting. The handle is always drawn densely so it stays readable.
 
 - `apiUrl` empty (the current state): the page shows `fallbackCount`, which is `1000`.
 - `apiUrl` set: the page shows the last count it received in this browser (or `fallbackCount`),
